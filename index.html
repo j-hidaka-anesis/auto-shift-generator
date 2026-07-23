@@ -87,8 +87,8 @@
       <input id="input-staff-name" type="text" placeholder="名前" class="w-24 p-1 border border-slate-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none text-xs">
       
       <select id="input-staff-type" class="p-1 border border-slate-200 rounded text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-500 w-28">
-        <option value="総合">総合</option>
-        <option value="一般(夜間なし)" selected>一般(夜間なし)</option>
+        <option value="総合" selected>総合</option>
+        <option value="一般(夜間なし)">一般(夜間なし)</option>
         <option value="一般(夜間あり)">一般(夜間あり)</option>
       </select>
       
@@ -256,42 +256,20 @@
     let colColors = {}; // 日付の列全体の背景色
     let memoColors = {}; // メモ欄個別の背景色
 
-    // 夜間担当の周期設定状態 (初期値: 2026-06-02から3日ごと)
-    let nightShiftConfig = { startDate: '2026-06-02', cycle: 3 };
+    // 夜間担当の周期設定状態 (初期値: 未設定)
+    let nightShiftConfig = { startDate: null, cycle: null };
 
     // 各種シフトの必要人数設定と、最大・最小の制限
-    // ※D枠、Z枠、なし枠を初期登録
+    // 初期状態は「なし」枠のみ
     let shiftReq = {
-      D: { 
-        weekday: { min: 2, max: 4, 'A': 1, 'B': 1, '10': 1, '11': 0 },
-        weekend: { min: 2, max: 2, 'A': 1, 'B': 1, '10': 0, '11': 0 }
-      },
-      Z: { 
-        weekday: { min: 4, max: 8, 'A': 1, 'B': 1, '10': 2, '11': 0 },
-        weekend: { min: 4, max: 5, 'A': 1, 'B': 1, '10': 2, '11': 0 }
-      },
       '': { // なし枠の設定
-        enabled: true, // オンオフ状態
-        weekday: { min: 0, max: 5, 'A': 0, 'B': 0, '10': 0, '11': 0 },
-        weekend: { min: 0, max: 5, 'A': 0, 'B': 0, '10': 0, '11': 0 }
+        enabled: false, // 最初は無効にする
+        weekday: { min: 0, max: 0, 'A': 0, 'B': 0, '10': 0, '11': 0 },
+        weekend: { min: 0, max: 0, 'A': 0, 'B': 0, '10': 0, '11': 0 }
       }
     };
 
-    let staffs = [
-      { id: '1', name: '金子', type: '総合', group: '', needsFollowUp: false, manualShifts: {}, offPreference: '' },
-      { id: '2', name: '山本', type: '総合', group: 'D', needsFollowUp: true, manualShifts: {}, offPreference: '' },
-      { id: '3', name: '阿部', type: '一般(夜間なし)', group: 'D', needsFollowUp: true, manualShifts: {}, offPreference: '' },
-      { id: '4', name: '山路', type: '一般(夜間なし)', group: 'D', needsFollowUp: true, manualShifts: {}, offPreference: '' },
-      { id: '5', name: '瀬戸', type: '総合', group: 'D', needsFollowUp: false, manualShifts: {}, offPreference: '' },
-      { id: '6', name: '日高', type: '総合', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
-      { id: '7', name: '久保木', type: '一般(夜間なし)', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
-      { id: '8', name: '三島', type: '一般(夜間なし)', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
-      { id: '9', name: '杉本', type: '総合', group: 'Z', needsFollowUp: false, manualShifts: {}, offPreference: '' },
-      { id: '10', name: '大木', type: '一般(夜間なし)', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
-      { id: '11', name: '諏訪', type: '総合', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
-      { id: '12', name: '葛西', type: '一般(夜間なし)', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
-      { id: '13', name: '山田', type: '総合', group: 'Z', needsFollowUp: false, manualShifts: {}, offPreference: '' },
-    ];
+    let staffs = [];
 
     const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -953,8 +931,8 @@
             }
             shiftReq[newName] = {
                enabled: true,
-               weekday: { min: 0, max: 10, 'A': 0, 'B': 0, '10': 0, '11': 0 },
-               weekend: { min: 0, max: 10, 'A': 0, 'B': 0, '10': 0, '11': 0 }
+               weekday: { min: 0, max: 0, 'A': 0, 'B': 0, '10': 0, '11': 0 },
+               weekend: { min: 0, max: 0, 'A': 0, 'B': 0, '10': 0, '11': 0 }
             };
             input.value = '';
             window.renderGroupManagement();
