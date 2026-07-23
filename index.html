@@ -1,0 +1,2349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>シフト自動生成ツール</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/japanese-holidays@latest/lib/japanese-holidays.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <style>
+    .custom-scrollbar::-webkit-scrollbar { height: 10px; width: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen p-2 md:p-4">
+
+  <div class="w-full mx-auto space-y-4 relative">
+    
+    <!-- Header -->
+    <header class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 items-center">
+      <div class="col-span-1">
+        <h1 class="text-xl md:text-2xl font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="calendar" class="w-6 h-6 text-indigo-600"></i>
+          シフト自動生成ツール
+        </h1>
+        <p class="text-xs md:text-sm text-slate-500 mt-1">表の各マスをクリックするとプルダウンが開き、シフトを選択できます</p>
+      </div>
+      
+      <div class="col-span-1 flex justify-center">
+        <div class="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+          <button id="btn-prev-month" class="p-3 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200">
+            <i data-lucide="chevron-left" class="w-6 h-6 text-slate-600"></i>
+          </button>
+          <h2 id="month-display" class="text-xl md:text-2xl font-black min-w-[160px] text-center text-slate-800">
+            <!-- JSで年月を描画 -->
+          </h2>
+          <button id="btn-next-month" class="p-3 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200">
+            <i data-lucide="chevron-right" class="w-6 h-6 text-slate-600"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="col-span-1 flex items-center md:justify-end gap-3">
+        <!-- Clear Button -->
+        <button id="btn-clear" class="px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all text-sm shrink-0" title="自動生成したシフトをクリア">
+          <i data-lucide="trash-2" class="w-4 h-4"></i> クリア
+        </button>
+
+        <!-- Generate Button -->
+        <button id="btn-generate" class="px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 text-white bg-indigo-600 hover:bg-indigo-700 hover:shadow-md hover:shadow-indigo-200 transition-all text-sm shrink-0">
+          <span id="btn-generate-content" class="flex items-center gap-1.5">
+            <i data-lucide="play" class="w-4 h-4"></i> シフト生成
+          </span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Settings Bar -->
+    <div class="flex flex-row flex-wrap items-center gap-3">
+      <button onclick="openShiftReqModal()" class="bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2 text-sm hover:bg-slate-50 transition-colors text-slate-700 font-semibold shrink-0">
+        <i data-lucide="settings-2" class="w-4 h-4 text-indigo-500"></i> シフト生成の設定
+      </button>
+
+      <button onclick="openStaffModal()" class="bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2 text-sm hover:bg-slate-50 transition-colors text-slate-600 font-semibold shrink-0">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4"></i> 社員設定
+      </button>
+    </div>
+  </div>
+
+  <!-- Right Area: Spreadsheet Table -->
+  <div class="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col relative w-full mt-4">
+    <div id="table-container" class="flex-1">
+      <!-- JSでテーブルを描画 -->
+    </div>
+  </div>
+
+  <!-- Staff Management (Moved below table) -->
+  <div class="bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4 text-sm w-fit mt-2">
+    <div class="font-semibold flex items-center gap-1.5 text-slate-700 border-r pr-4 border-slate-200 shrink-0">
+      <i data-lucide="users" class="w-4 h-4 text-slate-400"></i>
+      社員追加
+    </div>
+    <div class="flex items-center gap-2">
+      <input id="input-staff-name" type="text" placeholder="名前" class="w-24 p-1 border border-slate-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none text-xs">
+      
+      <select id="input-staff-type" class="p-1 border border-slate-200 rounded text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-500 w-28">
+        <option value="総合">総合</option>
+        <option value="一般(夜間なし)" selected>一般(夜間なし)</option>
+        <option value="一般(夜間あり)">一般(夜間あり)</option>
+      </select>
+      
+      <select id="input-staff-group" class="p-1 border border-slate-200 rounded text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-500 w-24">
+        <!-- JSで動的描画 -->
+      </select>
+      
+      <button id="btn-add-staff" class="bg-slate-900 text-white p-1 rounded hover:bg-slate-800 transition-colors flex justify-center items-center" title="追加">
+        <i data-lucide="user-plus" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </div>
+
+<!-- Shift Requirements Modal -->
+<div id="shift-req-modal" class="fixed inset-0 bg-slate-900/50 z-50 hidden flex justify-center items-start pt-10 md:pt-20 px-4 opacity-0 transition-opacity duration-200">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden transform scale-95 transition-transform duration-200" id="shift-req-modal-panel">
+      <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h2 class="font-bold text-slate-800 flex items-center gap-2">
+          <i data-lucide="settings-2" class="w-5 h-5 text-indigo-600"></i>
+          シフト生成の設定（人数制限）
+        </h2>
+        <button onclick="closeShiftReqModal()" class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div id="shift-req-modal-forms" class="p-5 overflow-y-auto max-h-[70vh] space-y-8">
+        <!-- JSで動的に設定フォームを描画 -->
+      </div>
+      <div class="p-4 border-t border-slate-100 bg-white flex justify-end">
+        <button onclick="closeShiftReqModal()" class="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+          設定完了
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Staff Settings Modal -->
+  <div id="staff-modal" class="fixed inset-0 bg-slate-900/50 z-50 hidden flex justify-center items-start pt-10 md:pt-20 px-4 opacity-0 transition-opacity duration-200">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden transform scale-95 transition-transform duration-200" id="staff-modal-panel">
+      <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h2 class="font-bold text-slate-800 flex items-center gap-2">
+          <i data-lucide="users-cog" class="w-5 h-5 text-indigo-600"></i>
+          社員設定
+        </h2>
+        <button onclick="closeStaffModal()" class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      
+      <!-- グループ管理エリア -->
+      <div class="p-4 border-b border-slate-100 bg-white">
+        <h3 class="font-bold text-slate-700 mb-2 flex items-center gap-2 text-sm">
+          <i data-lucide="folder-cog" class="w-4 h-4 text-slate-500"></i> グループ名の管理（編集・追加・削除）
+        </h3>
+        <div id="group-management-content" class="space-y-2">
+          <!-- JSで描画 -->
+        </div>
+      </div>
+
+      <div class="p-4 overflow-y-auto custom-scrollbar max-h-[50vh] bg-slate-50/50" id="staff-modal-content">
+        <!-- JSでリストを描画 -->
+      </div>
+      <div class="p-4 border-t border-slate-100 bg-white flex justify-end">
+        <button onclick="closeStaffModal()" class="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+          完了
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Night Shift Modal -->
+  <div id="night-shift-modal" class="fixed inset-0 bg-slate-900/50 z-[60] hidden flex justify-center items-center px-4 opacity-0 transition-opacity duration-200">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden transform scale-95 transition-transform duration-200" id="night-shift-modal-panel">
+      <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h2 class="font-bold text-slate-800 flex items-center gap-2">
+          <i data-lucide="moon" class="w-5 h-5 text-indigo-600"></i>
+          夜間担当の周期設定
+        </h2>
+        <button onclick="closeNightShiftModal()" class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <p class="text-sm text-slate-600 font-medium leading-relaxed" id="night-shift-modal-desc"></p>
+        <div>
+          <select id="night-shift-cycle-select" class="w-full p-2.5 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700 bg-slate-50 cursor-pointer">
+            <option value="2">2日に1回</option>
+            <option value="3">3日に1回</option>
+          </select>
+        </div>
+        <div class="flex gap-3 mt-4 pt-2">
+          <button onclick="clearNightShift()" class="flex-1 py-2.5 bg-white text-red-500 font-bold rounded-xl hover:bg-red-50 transition-colors shadow-sm border border-red-200 text-sm">
+            クリア<br><span class="text-[10px] font-normal">（印を消す）</span>
+          </button>
+          <button onclick="saveNightShift()" class="flex-1 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm text-sm flex items-center justify-center">
+            設定を保存
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Staff Summary Popup -->
+  <div id="staff-summary-popup" class="absolute z-[100] hidden bg-white rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.15)] border border-slate-200 p-3 w-32 transition-opacity duration-150 opacity-0 pointer-events-none text-slate-800 
+  after:content-[''] after:absolute after:top-1/2 after:-right-[9px] after:-translate-y-1/2 after:border-[5px] after:border-transparent after:border-l-slate-200
+  before:content-[''] before:absolute before:top-1/2 before:-right-[8px] before:-translate-y-1/2 before:border-[5px] before:border-transparent before:border-l-white">
+  </div>
+
+  <!-- Color Picker Modal -->
+  <div id="color-picker-modal" class="fixed inset-0 bg-slate-900/50 z-[70] hidden flex justify-center items-center px-4 opacity-0 transition-opacity duration-200">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xs flex flex-col overflow-hidden transform scale-95 transition-transform duration-200" id="color-picker-modal-panel">
+      <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h2 class="font-bold text-slate-800 flex items-center gap-2" id="color-picker-title">
+          <i data-lucide="palette" class="w-5 h-5 text-indigo-600"></i>
+          色の選択
+        </h2>
+        <button onclick="closeColorPicker()" class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="grid grid-cols-4 gap-3 place-items-center">
+           <button onclick="window.selectAndSaveColor('#fee2e2')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #fee2e2;" title="赤"></button>
+           <button onclick="window.selectAndSaveColor('#ffedd5')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #ffedd5;" title="オレンジ"></button>
+           <button onclick="window.selectAndSaveColor('#fef9c3')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #fef9c3;" title="黄"></button>
+           <button onclick="window.selectAndSaveColor('#dcfce7')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #dcfce7;" title="緑"></button>
+           
+           <button onclick="window.selectAndSaveColor('#cffafe')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #cffafe;" title="水色"></button>
+           <button onclick="window.selectAndSaveColor('#e0f2fe')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #e0f2fe;" title="空色"></button>
+           <button onclick="window.selectAndSaveColor('#dbeafe')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #dbeafe;" title="青"></button>
+           <button onclick="window.selectAndSaveColor('#e0e7ff')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #e0e7ff;" title="藍"></button>
+           
+           <button onclick="window.selectAndSaveColor('#f3e8ff')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #f3e8ff;" title="紫"></button>
+           <button onclick="window.selectAndSaveColor('#fce7f3')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #fce7f3;" title="ピンク"></button>
+           <button onclick="window.selectAndSaveColor('#ffe4e6')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #ffe4e6;" title="ローズ"></button>
+           <button onclick="window.selectAndSaveColor('#f1f5f9')" class="w-10 h-10 rounded-full shadow-sm border border-slate-200 hover:scale-110 hover:border-indigo-400 transition-all cursor-pointer" style="background-color: #f1f5f9;" title="グレー"></button>
+        </div>
+
+        <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+           <span class="text-[11px] text-slate-500 font-bold flex items-center gap-1"><i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> 自由に色を作る</span>
+           <div class="flex items-center gap-2">
+             <input type="color" id="color-picker-input" class="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent" value="#ffcccc">
+             <button onclick="saveColorSelection()" class="px-3 py-1 bg-slate-800 text-white font-bold rounded hover:bg-slate-700 transition-colors shadow-sm text-xs">
+               決定
+             </button>
+           </div>
+        </div>
+
+        <div class="mt-2 pt-2 border-t border-slate-100">
+          <button onclick="clearColorSelection()" class="w-full py-2.5 bg-white text-red-500 font-bold rounded-xl hover:bg-red-50 transition-colors shadow-sm border border-red-200 text-sm flex items-center justify-center gap-2">
+            <i data-lucide="eraser" class="w-4 h-4"></i> 色を消す（クリア）
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- State ---
+    let currentDate = new Date();
+    let generatedShifts = {}; 
+    let isSummaryExpanded = true; // 集計行のアコーディオン開閉状態
+    let dailyMemos = {}; // 日ごとの自由入力メモ
+    let isMemoVisible = true; // メモ欄の表示・非表示状態
+    let colColors = {}; // 日付の列全体の背景色
+    let memoColors = {}; // メモ欄個別の背景色
+
+    // 夜間担当の周期設定状態 (初期値: 2026-06-02から3日ごと)
+    let nightShiftConfig = { startDate: '2026-06-02', cycle: 3 };
+
+    // 各種シフトの必要人数設定と、最大・最小の制限
+    // ※D枠、Z枠、なし枠を初期登録
+    let shiftReq = {
+      D: { 
+        weekday: { min: 2, max: 4, 'A': 1, 'B': 1, '10': 1, '11': 0 },
+        weekend: { min: 2, max: 2, 'A': 1, 'B': 1, '10': 0, '11': 0 }
+      },
+      Z: { 
+        weekday: { min: 4, max: 8, 'A': 1, 'B': 1, '10': 2, '11': 0 },
+        weekend: { min: 4, max: 5, 'A': 1, 'B': 1, '10': 2, '11': 0 }
+      },
+      '': { // なし枠の設定
+        enabled: true, // オンオフ状態
+        weekday: { min: 0, max: 5, 'A': 0, 'B': 0, '10': 0, '11': 0 },
+        weekend: { min: 0, max: 5, 'A': 0, 'B': 0, '10': 0, '11': 0 }
+      }
+    };
+
+    let staffs = [
+      { id: '1', name: '金子', type: '総合', group: '', needsFollowUp: false, manualShifts: {}, offPreference: '' },
+      { id: '2', name: '山本', type: '総合', group: 'D', needsFollowUp: true, manualShifts: {}, offPreference: '' },
+      { id: '3', name: '阿部', type: '一般(夜間なし)', group: 'D', needsFollowUp: true, manualShifts: {}, offPreference: '' },
+      { id: '4', name: '山路', type: '一般(夜間なし)', group: 'D', needsFollowUp: true, manualShifts: {}, offPreference: '' },
+      { id: '5', name: '瀬戸', type: '総合', group: 'D', needsFollowUp: false, manualShifts: {}, offPreference: '' },
+      { id: '6', name: '日高', type: '総合', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
+      { id: '7', name: '久保木', type: '一般(夜間なし)', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
+      { id: '8', name: '三島', type: '一般(夜間なし)', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
+      { id: '9', name: '杉本', type: '総合', group: 'Z', needsFollowUp: false, manualShifts: {}, offPreference: '' },
+      { id: '10', name: '大木', type: '一般(夜間なし)', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
+      { id: '11', name: '諏訪', type: '総合', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
+      { id: '12', name: '葛西', type: '一般(夜間なし)', group: 'Z', needsFollowUp: true, manualShifts: {}, offPreference: '' },
+      { id: '13', name: '山田', type: '総合', group: 'Z', needsFollowUp: false, manualShifts: {}, offPreference: '' },
+    ];
+
+    const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+
+    // --- Render Functions ---
+
+    function renderMonthHeader() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      document.getElementById('month-display').textContent = `${year}年 ${month}月`;
+    }
+
+    // スタッフ追加フォームのグループ選択プルダウンを描画する
+    window.renderAddFormGroup = () => {
+      const select = document.getElementById('input-staff-group');
+      const currentVal = select.value || '';
+      let html = `<option value="">なし</option>`;
+      
+      const groupNames = Object.keys(shiftReq).filter(g => g !== '');
+      groupNames.forEach(g => {
+        html += `<option value="${g}">${g}</option>`;
+      });
+      select.innerHTML = html;
+      
+      if (Object.keys(shiftReq).includes(currentVal) || currentVal === '') {
+          select.value = currentVal;
+      } else {
+          select.value = '';
+      }
+    };
+
+    function renderTable() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      const calendarDays = [];
+      let currentWeek = 0;
+      let weekendDaysCount = 0; 
+      let weekendsOnlyCount = 0;
+      for (let i = 1; i <= daysInMonth; i++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        const dateObj = new Date(year, month, i);
+        const dayOfWeek = dateObj.getDay();
+        if (dayOfWeek === 0 && i !== 1) currentWeek++;
+        
+        const holidayName = typeof JapaneseHolidays !== 'undefined' ? JapaneseHolidays.isHoliday(dateObj) : null;
+        const isHoliday = !!holidayName;
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6 || isHoliday;
+        
+        if (isWeekend) weekendDaysCount++;
+        if (dayOfWeek === 0 || dayOfWeek === 6) weekendsOnlyCount++;
+
+        let isNightShiftDay = false;
+        if (nightShiftConfig.startDate && nightShiftConfig.cycle) {
+          const startObj = new Date(nightShiftConfig.startDate);
+          const diffTime = dateObj.getTime() - startObj.getTime();
+          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays >= 0 && diffDays % nightShiftConfig.cycle === 0) {
+            isNightShiftDay = true;
+          }
+        }
+
+        calendarDays.push({ day: i, dateStr, isWeekend, dayOfWeek, weekNumber: currentWeek, isHoliday, holidayName, isNightShiftDay });
+      }
+
+      let html = `<table class="w-full border-collapse text-xs table-fixed">`;
+      
+      // -- Header --
+      html += `<thead><tr>
+        <th class="sticky left-0 top-0 z-20 bg-slate-100 border-b border-r border-slate-200 p-1 w-[50px] md:w-[70px] text-center shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] truncate text-[9px] md:text-[10px]"></th>`;
+      
+      calendarDays.forEach(d => {
+        let colorClass = (d.dayOfWeek === 0 || d.isHoliday) ? 'bg-red-50 text-red-600' : d.dayOfWeek === 6 ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-700';
+        html += `<th onclick="window.openColColorPicker('${d.dateStr}')" class="header-day-${d.dateStr} sticky top-0 z-10 border-b border-r border-slate-200 p-0.5 text-center transition-all duration-75 cursor-pointer hover:brightness-95 ${colorClass}" title="${d.holidayName || ''}\nクリックで列の色を変更">
+          <div class="font-bold text-[10px] md:text-xs leading-none">${d.day}</div>
+          <div class="text-[8px] md:text-[9px] font-normal opacity-80 leading-none mt-0.5">${DAY_NAMES[d.dayOfWeek]}</div>
+        </th>`;
+      });
+      
+      html += `<th class="sticky right-[40px] md:right-[50px] top-0 z-20 bg-slate-100 border-b border-l border-slate-200 p-1 w-[50px] md:w-[70px] text-center shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate text-[9px] md:text-[10px]"></th>`;
+      html += `<th class="sticky right-0 top-0 z-20 bg-slate-100 border-b border-l border-slate-200 p-1 w-[40px] md:w-[50px] text-center shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-[8px] md:text-[9px]"></th></tr>`;
+
+      // -- 夜間担当 row (上に移動) --
+      html += `<tr class="h-[22px]"><th class="sticky left-0 z-10 bg-white border-b border-r border-slate-200 px-1 py-0 text-center text-[9px] md:text-[10px] font-bold text-slate-600 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] truncate leading-tight">
+        <div class="flex items-center justify-center w-full h-full">夜間</div>
+      </th>`;
+      calendarDays.forEach(d => {
+        let mark = '';
+        let bgClass = 'bg-white hover:bg-slate-50';
+        
+        if (d.isNightShiftDay) {
+          mark = '〇';
+          bgClass = 'bg-yellow-100 hover:bg-yellow-200';
+        }
+        
+        html += `<th onclick="window.openNightShiftModal('${d.dateStr}')" class="border-b border-r border-slate-200 p-0 text-center text-[8px] md:text-[10px] font-bold text-slate-600 ${bgClass} leading-none cursor-pointer transition-colors" title="クリックして周期を設定">${mark}</th>`;
+      });
+      html += `<th class="sticky right-[40px] md:right-[50px] z-10 bg-white border-b border-l border-slate-200 px-1 py-0 text-center text-[9px] md:text-[10px] font-bold text-slate-600 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate leading-tight">
+        <div class="flex items-center justify-center w-full h-full">夜間</div>
+      </th>`;
+      html += `<th class="sticky right-0 z-10 bg-white border-b border-l border-slate-200 p-0 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]"></th></tr>`;
+
+      // -- メモ row (下に移動) --
+      let memoHeightClass = isMemoVisible ? 'h-10 md:h-11' : 'h-[22px]';
+      html += `<tr class="${memoHeightClass}">
+        <th class="sticky left-0 z-10 bg-slate-50 border-b border-r border-slate-200 px-1 py-0 text-center text-[8px] md:text-[9px] font-normal text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] truncate leading-tight cursor-pointer hover:bg-slate-200 transition-colors" onclick="window.toggleMemoVisibility()" title="クリックでメモ欄を開閉">
+          <div class="flex items-center justify-center gap-0.5 w-full h-full">
+            <i data-lucide="${isMemoVisible ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5 text-slate-500"></i>
+            <span class="font-bold text-[9px] md:text-[10px] text-slate-600">メモ</span>
+          </div>
+        </th>`;
+      calendarDays.forEach(d => {
+        let customCellColor = memoColors[d.dateStr] || colColors[d.dateStr] || '';
+        let colColorStyle = customCellColor ? `background-color: ${customCellColor} !important;` : '';
+        const memoVal = dailyMemos[d.dateStr] || '';
+        const escapedMemoVal = memoVal.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const hasMemo = memoVal.trim() !== '';
+
+        if (isMemoVisible) {
+          html += `<th class="border-b border-r border-slate-200 p-0 relative bg-white focus-within:bg-indigo-50 focus-within:ring-1 focus-within:ring-indigo-500 focus-within:z-20 cursor-text group/memo" style="${colColorStyle}" onclick="const div = this.querySelector('div'); if(document.activeElement !== div) div.focus();">
+            <button onclick="event.stopPropagation(); window.openMemoColorPicker('${d.dateStr}')" class="absolute top-0 right-0 p-0.5 text-slate-400 hover:text-indigo-600 opacity-60 md:opacity-0 focus:opacity-100 md:group-hover/memo:opacity-100 transition-opacity z-10 cursor-pointer" title="メモ欄の色を変更">
+              <i data-lucide="palette" class="w-3 h-3"></i>
+            </button>
+            <div contenteditable="true" 
+                 onblur="window.handleMemoChange('${d.dateStr}', this.innerText)" 
+                 onkeydown="if(event.key === 'Enter'){ if(event.altKey){ event.preventDefault(); document.execCommand('insertLineBreak'); } else { event.preventDefault(); this.blur(); } }" 
+                 class="w-full h-full min-h-[40px] md:min-h-[44px] flex items-center justify-center text-center text-[8px] md:text-[10px] text-slate-700 outline-none font-normal px-0.5 leading-tight overflow-hidden whitespace-pre-wrap break-all">${escapedMemoVal}</div>
+          </th>`;
+        } else {
+          let content = '';
+          let titleAttr = '';
+          if (hasMemo) {
+             content = `<i data-lucide="message-square-text" class="w-3 h-3 text-indigo-400"></i>`;
+             titleAttr = `title="${escapedMemoVal}"`;
+          }
+          html += `<th class="border-b border-r border-slate-200 p-0 text-center cursor-pointer bg-white hover:bg-slate-50 transition-colors" style="${colColorStyle}" ${titleAttr} onclick="window.toggleMemoVisibility()">
+             <div class="flex items-center justify-center w-full h-full">
+               ${content}
+             </div>
+          </th>`;
+        }
+      });
+      html += `<th class="sticky right-[40px] md:right-[50px] z-10 bg-slate-50 border-b border-l border-slate-200 px-1 py-0 text-center text-[8px] md:text-[9px] font-normal text-slate-500 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate leading-tight cursor-pointer hover:bg-slate-200 transition-colors" onclick="window.toggleMemoVisibility()" title="クリックでメモ欄を開閉">
+          <div class="flex items-center justify-center gap-0.5 w-full h-full">
+            <span class="font-bold text-[9px] md:text-[10px] text-slate-600">メモ</span>
+            <i data-lucide="${isMemoVisible ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5 text-slate-500"></i>
+          </div>
+      </th>`;
+      html += `<th class="sticky right-0 z-10 bg-slate-50 border-b border-l border-slate-200 px-1 py-0 text-center text-[9px] md:text-[10px] font-bold text-slate-600 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] leading-tight">
+        <div class="flex items-center justify-center w-full h-full">出/休</div>
+      </th></tr>`;
+
+      // -- 集計行アコーディオンヘッダー --
+      if (Object.keys(generatedShifts).length > 0) {
+        html += `<tr class="h-[22px] cursor-pointer hover:bg-slate-200/70 transition-colors bg-slate-100/80" onclick="window.toggleSummary()">
+          <th class="sticky left-0 z-10 border-b border-r border-slate-200 px-1 py-0 text-center text-[9px] md:text-[10px] font-bold text-slate-700 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+            <div class="flex items-center justify-center gap-0.5 w-full h-full">
+              <i data-lucide="${isSummaryExpanded ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5 text-slate-500"></i>
+              <span class="truncate">内訳</span>
+            </div>
+          </th>`;
+        calendarDays.forEach(d => {
+          let totalCount = 0;
+          staffs.forEach(s => {
+            const val = s.manualShifts[d.dateStr];
+            if (val && val !== '休' && val !== '有休') totalCount++;
+            else if (!val && generatedShifts[d.dateStr] && generatedShifts[d.dateStr][s.id] && generatedShifts[d.dateStr][s.id] !== '休') totalCount++;
+          });
+          html += `<th class="border-b border-r border-slate-200 text-center text-[10px] md:text-xs font-black text-slate-700 leading-none">${totalCount}</th>`;
+        });
+        html += `<th class="sticky right-[40px] md:right-[50px] z-10 border-b border-l border-slate-200 px-1 py-0 text-center text-[9px] md:text-[10px] font-bold text-slate-700 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate leading-tight">
+          <div class="flex items-center justify-center gap-0.5 w-full h-full">
+            <span class="truncate">内訳</span>
+            <i data-lucide="${isSummaryExpanded ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5 text-slate-500"></i>
+          </div>
+        </th>`;
+        html += `<th class="sticky right-0 z-10 border-b border-l border-slate-200"></th></tr>`;
+      }
+
+      // -- 各グループの出勤人数 row (アコーディオン開閉) --
+      if (isSummaryExpanded && Object.keys(generatedShifts).length > 0) {
+        const activeGroups = [];
+        const allGroups = Object.keys(shiftReq);
+        allGroups.forEach(g => {
+            if(g !== '' && shiftReq[g].enabled !== false) activeGroups.push(g);
+        });
+        // 「なし」グループは内訳に表示しないため追加しない
+
+        activeGroups.forEach(groupName => {
+          const displayName = groupName === '' ? 'なし' : groupName;
+          const bgClass = groupName === '' ? 'bg-slate-50' : 'bg-indigo-50';
+          const textClass = groupName === '' ? 'text-slate-700' : 'text-indigo-700';
+          
+          html += `<tr class="h-[22px]"><th class="sticky left-0 z-10 ${bgClass} border-b border-r border-slate-200 px-1 py-0 text-center text-[9px] md:text-[10px] font-bold ${textClass} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] truncate leading-tight">
+            <div class="flex items-center justify-center w-full h-full">${displayName}出勤</div>
+          </th>`;
+          
+          calendarDays.forEach(d => {
+            let count = 0;
+            staffs.forEach(s => {
+              if (s.group !== groupName) return;
+              const val = s.manualShifts[d.dateStr];
+              if (val && val !== '休' && val !== '有休') count++;
+              else if (generatedShifts[d.dateStr] && generatedShifts[d.dateStr][s.id] && generatedShifts[d.dateStr][s.id] !== '休') count++;
+            });
+            const reqObj = d.isWeekend ? shiftReq[groupName].weekend : shiftReq[groupName].weekday;
+            // 設定した最小値を下回った場合に赤色警告
+            const isWarning = count < reqObj.min;
+            
+            html += `<th class="border-b border-r p-0 text-center text-[8px] md:text-[10px] font-bold ${isWarning ? 'bg-red-100 text-red-700 border-red-200' : `${bgClass} ${textClass} border-slate-200`} leading-none">${count}</th>`;
+          });
+          
+          html += `<th class="sticky right-[40px] md:right-[50px] z-10 ${bgClass} border-b border-l border-slate-200 px-1 py-0 text-center text-[9px] md:text-[10px] font-bold ${textClass} shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate leading-tight">
+            <div class="flex items-center justify-center w-full h-full">${displayName}出勤</div>
+          </th>`;
+          html += `<th class="sticky right-0 z-10 ${bgClass} border-b border-l border-slate-200 p-0 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]"></th></tr>`;
+        });
+      }
+      
+      html += `</thead><tbody>`;
+
+      let currentGroup = null;
+
+      // -- Body --
+      staffs.forEach((staff, index) => {
+        let isGroupStart = staff.group !== currentGroup;
+        currentGroup = staff.group;
+
+        if (isGroupStart && index !== 0) {
+          let dividerHtml = `<tr class="bg-slate-200">
+            <td class="sticky left-0 z-10 bg-slate-200 border-b border-r border-slate-300 p-0 h-1 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]"></td>`;
+          calendarDays.forEach(d => {
+            dividerHtml += `<td class="bg-slate-200 border-b border-r border-slate-300 p-0 h-1"></td>`;
+          });
+          dividerHtml += `<td class="sticky right-[40px] md:right-[50px] z-10 bg-slate-200 border-b border-l border-slate-300 p-0 h-1 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)]"></td>`;
+          dividerHtml += `<td class="sticky right-0 z-10 bg-slate-200 border-b border-l border-slate-300 p-0 h-1 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)]"></td>
+          </tr>`;
+          html += dividerHtml;
+        }
+
+        let workCount = 0;
+        let manualOffCount = 0; 
+        let counts = { 'A': 0, 'B': 0, '10': 0, '11': 0, '有休': 0 }; // 内訳カウント用
+        let dotColorClass = staff.type === '総合' ? 'bg-blue-500' : 'bg-yellow-400';
+        
+        let rowHtml = `<tr class="group">
+          <td class="sticky left-0 z-10 bg-white group-hover:brightness-95 transition-all duration-75 border-b border-r border-slate-200 p-1 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div class="relative flex items-center justify-center h-full group/staff">
+              <div class="flex items-center gap-0.5 relative w-full justify-center">
+                <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${dotColorClass}"></div>
+                <span class="font-medium text-slate-800 text-[9px] md:text-[11px] truncate max-w-[36px] md:max-w-[50px] inline-block ml-1 md:ml-2">${staff.name}</span>
+              </div>
+            </div>
+          </td>`;
+          
+        calendarDays.forEach(d => {
+          const manualVal = staff.manualShifts[d.dateStr];
+          const autoVal = generatedShifts[d.dateStr] && generatedShifts[d.dateStr][staff.id];
+          const isAutoWorking = !!autoVal && autoVal !== '休';
+          const isAutoOff = autoVal === '休';
+          
+          let displayVal = '';
+          let textColor = '';
+          let bgColor = 'bg-white';
+          
+          let isCustom = manualVal && !['休', '有休', 'A', 'B', '10', '11'].includes(manualVal);
+          
+          // 内訳カウントと表示色の設定
+          if (manualVal) {
+            displayVal = manualVal;
+            if (manualVal === '休' || manualVal === '有休') {
+              textColor = 'text-red-600';
+              bgColor = 'bg-red-100'; 
+              manualOffCount++;
+              if (manualVal === '有休') counts['有休']++;
+            } else if (['A', 'B', '10', '11'].includes(manualVal)) {
+              textColor = 'text-red-600'; 
+              workCount++;
+              counts[manualVal]++;
+            } else {
+              textColor = 'text-blue-700'; 
+              workCount++;
+            }
+          } else if (isAutoWorking) {
+            displayVal = autoVal; 
+            textColor = 'text-blue-600';
+            bgColor = 'bg-white';
+            workCount++;
+            if (['A', 'B', '10', '11'].includes(autoVal)) {
+              counts[autoVal]++;
+            }
+          } else if (isAutoOff) {
+            displayVal = '休';
+            textColor = 'text-blue-600'; 
+            bgColor = 'bg-blue-100';
+          } else if (d.isWeekend) {
+            bgColor = 'bg-slate-50/50';
+          }
+          
+          if (d.isNightShiftDay && displayVal === 'B' && staff.type !== '一般(夜間なし)') {
+            bgColor = 'bg-yellow-100';
+          }
+          
+          let fontSizeClass = '';
+          const standardShifts = ['A', 'B', '10', '11', '休', '有休'];
+          
+          if (standardShifts.includes(displayVal)) {
+              // 定型の基本シフトはすべて同じ13pxに統一
+              fontSizeClass = 'text-[13px] font-black whitespace-nowrap tracking-tighter';
+          } else if (displayVal.length <= 2) {
+              fontSizeClass = 'text-xs md:text-sm whitespace-nowrap';
+          } else if (displayVal.length === 3) {
+              fontSizeClass = 'text-[10px] md:text-xs whitespace-nowrap';
+          } else {
+              fontSizeClass = 'text-[8px] md:text-[10px] leading-tight break-all whitespace-normal';
+          }
+
+          let optionsHtml = `
+            <option value=""></option>
+            <option value="A" ${manualVal === 'A' ? 'selected' : ''}>A</option>
+            <option value="10" ${manualVal === '10' ? 'selected' : ''}>10</option>
+            <option value="11" ${manualVal === '11' ? 'selected' : ''}>11</option>
+            <option value="B" ${manualVal === 'B' ? 'selected' : ''}>B</option>
+            <option value="休" ${manualVal === '休' ? 'selected' : ''}>休</option>
+            <option value="有休" ${manualVal === '有休' ? 'selected' : ''}>有休</option>
+            <option value="custom">自由入力...</option>
+            <option value="color">🎨 セルの色を変更...</option>
+          `;
+          if (isCustom) {
+            optionsHtml += `<option value="${manualVal}" selected>${manualVal}</option>`;
+          }
+
+          let customCellColor = '';
+          // 個別に設定したセルの色は最優先
+          if (staff.cellColors && staff.cellColors[d.dateStr]) {
+            customCellColor = staff.cellColors[d.dateStr];
+          } else if (colColors[d.dateStr]) {
+            const isNightB = d.isNightShiftDay && displayVal === 'B' && staff.type !== '一般(夜間なし)';
+            // 列全体の色変更時、手動入力の「休」「有休」、および夜間担当シフトは対象外（元の色を残す）
+            if (manualVal !== '休' && manualVal !== '有休' && !isNightB) {
+              customCellColor = colColors[d.dateStr];
+            }
+          }
+
+          let styleAttr = `height: 36px;`;
+          if (customCellColor) {
+              styleAttr += ` background-color: ${customCellColor} !important;`;
+          }
+
+          rowHtml += `<td onmouseenter="highlightCol('${d.dateStr}')" onmouseleave="unhighlightCol('${d.dateStr}')" class="border-b border-r border-slate-200 p-0 text-center relative group-hover:brightness-95 hover:!brightness-[0.85] transition-all duration-75 ${bgColor}" style="${styleAttr}">
+            <div class="flex items-center justify-center w-full h-full px-0.5 font-bold pointer-events-none ${textColor} ${fontSizeClass} overflow-hidden">
+              ${displayVal}
+            </div>
+            <select onchange="handleSelectChange(event, '${staff.id}', '${d.dateStr}')" 
+                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+              ${optionsHtml}
+            </select>
+          </td>`;
+        });
+        
+        let restCount = calendarDays.length - workCount;
+        let restDisplay = restCount;
+        
+        let requiredBaseOff = staff.type.includes('一般') ? 10 : weekendsOnlyCount;
+        
+        let manualPaidOffCount = 0; 
+        calendarDays.forEach(d => {
+          if (staff.manualShifts[d.dateStr] === '有休') {
+            manualPaidOffCount++;
+          }
+        });
+
+        let targetTotalOff = requiredBaseOff + manualPaidOffCount;
+
+        if (Object.keys(generatedShifts).length > 0) {
+          if (staff.type.includes('一般') && restCount !== targetTotalOff) {
+            let titleMsg = `一般は10日+有休(${manualPaidOffCount}日)の合計${targetTotalOff}日休みが必要です`;
+            restDisplay = `<span class="text-red-500 font-bold" title="${titleMsg}">${restCount}</span>`;
+          } else if (staff.type === '総合') {
+            if (Math.abs(restCount - targetTotalOff) >= 2) {
+              let titleMsg = `総合は完全週休2日(土日と同数: ${targetTotalOff}日)のペースですが、少し離れています`;
+              restDisplay = `<span class="text-orange-500 font-bold" title="${titleMsg}">${restCount}</span>`;
+            } else if (restCount !== targetTotalOff) {
+              let titleMsg = `総合は完全週休2日(土日と同数: ${targetTotalOff}日)のペースで組まれています`;
+              restDisplay = `<span class="text-slate-600 font-bold" title="${titleMsg}">${restCount}</span>`;
+            }
+          }
+        }
+
+        rowHtml += `<td class="sticky right-[40px] md:right-[50px] z-10 bg-white group-hover:brightness-95 transition-all duration-75 border-b border-l border-slate-200 p-1 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)] overflow-hidden">
+          <div class="relative flex items-center justify-center h-full group/staff">
+            <div class="flex items-center gap-0.5 relative w-full justify-center">
+              <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${dotColorClass}"></div>
+              <span class="font-medium text-slate-800 text-[9px] md:text-[11px] truncate max-w-[36px] md:max-w-[50px] inline-block ml-1 md:ml-2">${staff.name}</span>
+            </div>
+          </div>
+        </td>`;
+
+        rowHtml += `<td onclick="window.showStaffSummary(event, '${staff.id}')" class="sticky right-0 z-10 bg-white group-hover:brightness-95 hover:!bg-indigo-50 transition-all duration-75 border-b border-l border-slate-200 p-1 text-center text-[8px] md:text-[9px] text-slate-600 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)] cursor-pointer" title="クリックで詳しい内訳を表示">
+          <span class="font-bold ${workCount > 0 ? 'text-blue-600' : ''}">${workCount}</span><span class="text-slate-300 scale-75 inline-block mx-px">/</span>${restDisplay}
+        </td></tr>`;
+        
+        html += rowHtml;
+      });
+      
+      html += `</tbody>`;
+
+      // -- Footer --
+      html += `<tfoot><tr>
+        <th class="sticky left-0 bottom-0 z-20 bg-slate-100 border-t border-r border-slate-200 p-1 w-[50px] md:w-[70px] text-center shadow-[2px_-2px_5px_-2px_rgba(0,0,0,0.1)] truncate text-[9px] md:text-[10px]"></th>`;
+      
+      calendarDays.forEach(d => {
+        let colorClass = (d.dayOfWeek === 0 || d.isHoliday) ? 'bg-red-50 text-red-600' : d.dayOfWeek === 6 ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-700';
+        html += `<th onclick="window.openColColorPicker('${d.dateStr}')" class="header-day-${d.dateStr} sticky bottom-0 z-10 border-t border-r border-slate-200 p-0.5 text-center transition-all duration-75 cursor-pointer hover:brightness-95 ${colorClass}" title="${d.holidayName || ''}\nクリックで列の色を変更">
+          <div class="font-bold text-[10px] md:text-xs leading-none">${d.day}</div>
+          <div class="text-[8px] md:text-[9px] font-normal opacity-80 leading-none mt-0.5">${DAY_NAMES[d.dayOfWeek]}</div>
+        </th>`;
+      });
+      
+      html += `<th class="sticky right-[40px] md:right-[50px] bottom-0 z-20 bg-slate-100 border-t border-l border-slate-200 p-1 w-[50px] md:w-[70px] text-center shadow-[-2px_-2px_5px_-2px_rgba(0,0,0,0.05)] truncate text-[9px] md:text-[10px]"></th>`;
+      html += `<th class="sticky right-0 bottom-0 z-20 bg-slate-100 border-t border-l border-slate-200 p-1 w-[40px] md:w-[50px] text-center shadow-[-2px_-2px_5px_-2px_rgba(0,0,0,0.1)] text-[8px] md:text-[9px]"></th></tr></tfoot>`;
+
+      html += `</table>`;
+      document.getElementById('table-container').innerHTML = html;
+      
+      lucide.createIcons();
+    }
+
+    // アコーディオンの開閉トグル
+    window.toggleSummary = () => {
+      isSummaryExpanded = !isSummaryExpanded;
+      renderTable();
+    };
+
+    // --- Modal Functions ---
+
+    window.openShiftReqModal = () => {
+      const modal = document.getElementById('shift-req-modal');
+      const panel = document.getElementById('shift-req-modal-panel');
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        panel.classList.remove('scale-95');
+      }, 10);
+    };
+
+    window.closeShiftReqModal = () => {
+      const modal = document.getElementById('shift-req-modal');
+      const panel = document.getElementById('shift-req-modal-panel');
+      modal.classList.add('opacity-0');
+      panel.classList.add('scale-95');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 200);
+    };
+
+    window.renderShiftReqForms = () => {
+      let html = '';
+      const groups = Object.keys(shiftReq);
+      
+      const displayOrder = [];
+      groups.forEach(g => {
+          if (g !== '') displayOrder.push(g);
+      });
+      if (groups.includes('')) displayOrder.push(''); // なし枠は最後に
+
+      displayOrder.forEach(g => {
+          const req = shiftReq[g];
+          const isNone = g === '';
+          const displayName = isNone ? 'なし' : g;
+          const dotColor = isNone ? 'bg-slate-500' : 'bg-indigo-500';
+          const borderColor = isNone ? 'border-slate-200' : 'border-indigo-200';
+          
+          const hasToggle = true; // すべての枠で有効/無効の切り替えを可能に
+          const enabled = req.enabled !== false; 
+
+          html += `<div>`;
+          
+          if (hasToggle) {
+              html += `
+              <div class="flex justify-between items-center mb-3 border-b-2 ${borderColor} pb-1">
+                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                  <div class="w-2 h-2 rounded-full ${dotColor}"></div> ${displayName}枠 の設定
+                </h3>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <span class="text-xs font-bold text-slate-600">${enabled ? '有効' : '無効'}</span>
+                  <div class="relative">
+                    <input type="checkbox" class="sr-only peer" ${enabled ? 'checked' : ''} onchange="window.handleReqToggle('${g}', this.checked)">
+                    <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </div>
+                </label>
+              </div>`;
+          } else {
+              html += `
+              <h3 class="font-bold text-slate-800 text-base mb-3 border-b-2 ${borderColor} pb-1 flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full ${dotColor}"></div> ${displayName}枠 の設定
+              </h3>`;
+          }
+
+          const opacityClass = enabled ? 'opacity-100' : 'opacity-40 pointer-events-none';
+
+          html += `<div class="space-y-3 transition-opacity duration-200 ${opacityClass}">`;
+
+          // 平日
+          html += `
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 max-w-md mx-auto">
+              <div class="text-sm font-bold text-slate-700 mb-2 border-b border-slate-200 pb-1">平日</div>
+              <div class="mb-3">
+                <div class="text-[11px] text-slate-500 font-bold mb-1">合計出勤人数の制限（絶対条件）</div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-slate-600">最大:</span>
+                  <input type="number" min="0" value="${req.weekday.max}" onchange="window.handleReqChange('${g}', 'weekday', 'max', event.target.value)" class="w-16 p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <span class="text-xs text-slate-600">人 〜 最小:</span>
+                  <input type="number" min="0" value="${req.weekday.min}" onchange="window.handleReqChange('${g}', 'weekday', 'min', event.target.value)" class="w-16 p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <span class="text-xs text-slate-600">人</span>
+                </div>
+              </div>
+              <div>
+                <div class="text-[11px] text-slate-500 font-bold mb-1">各シフトの内訳（目標人数）</div>
+                <div class="flex gap-2 justify-between">
+                  <div class="text-center w-full"><div class="text-xs text-slate-500 mb-0.5">A</div><input type="number" min="0" value="${req.weekday['A']}" onchange="window.handleReqChange('${g}', 'weekday', 'A', event.target.value)" class="w-full p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                  <div class="text-center w-full"><div class="text-xs text-slate-500 mb-0.5">B</div><input type="number" min="0" value="${req.weekday['B']}" onchange="window.handleReqChange('${g}', 'weekday', 'B', event.target.value)" class="w-full p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                  <div class="text-center w-full"><div class="text-xs text-slate-500 mb-0.5">10</div><input type="number" min="0" value="${req.weekday['10']}" onchange="window.handleReqChange('${g}', 'weekday', '10', event.target.value)" class="w-full p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                  <div class="text-center w-full"><div class="text-xs text-slate-500 mb-0.5">11</div><input type="number" min="0" value="${req.weekday['11'] || 0}" onchange="window.handleReqChange('${g}', 'weekday', '11', event.target.value)" class="w-full p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                </div>
+              </div>
+            </div>
+          `;
+
+          // 土日祝
+          html += `
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 max-w-md mx-auto">
+              <div class="text-sm font-bold text-rose-700 mb-2 border-b border-rose-200 pb-1">土日祝</div>
+              <div class="mb-3">
+                <div class="text-[11px] text-slate-500 font-bold mb-1">合計出勤人数の制限（絶対条件）</div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-slate-600">最大:</span>
+                  <input type="number" min="0" value="${req.weekend.max}" onchange="window.handleReqChange('${g}', 'weekend', 'max', event.target.value)" class="w-16 p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <span class="text-xs text-slate-600">人 〜 最小:</span>
+                  <input type="number" min="0" value="${req.weekend.min}" onchange="window.handleReqChange('${g}', 'weekend', 'min', event.target.value)" class="w-16 p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <span class="text-xs text-slate-600">人</span>
+                </div>
+              </div>
+              <div>
+                <div class="text-[11px] text-slate-500 font-bold mb-1">各シフトの内訳（目標人数）</div>
+                <div class="flex gap-2 justify-between">
+                  <div class="text-center w-full"><div class="text-xs text-slate-500 mb-0.5">A</div><input type="number" min="0" value="${req.weekend['A']}" onchange="window.handleReqChange('${g}', 'weekend', 'A', event.target.value)" class="w-full p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                  <div class="text-center w-full"><div class="text-xs text-slate-500 mb-0.5">B</div><input type="number" min="0" value="${req.weekend['B']}" onchange="window.handleReqChange('${g}', 'weekend', 'B', event.target.value)" class="w-full p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                  <div class="text-center w-full"><div class="text-xs text-slate-500 mb-0.5">10</div><input type="number" min="0" value="${req.weekend['10']}" onchange="window.handleReqChange('${g}', 'weekend', '10', event.target.value)" class="w-full p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                  <div class="text-center w-full"><div class="text-xs text-slate-500 mb-0.5">11</div><input type="number" min="0" value="${req.weekend['11'] || 0}" onchange="window.handleReqChange('${g}', 'weekend', '11', event.target.value)" class="w-full p-1 text-center border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                </div>
+              </div>
+            </div>
+          `;
+          
+          html += `</div></div>`;
+      });
+
+      document.getElementById('shift-req-modal-forms').innerHTML = html;
+    };
+
+    window.handleReqChange = (groupName, dayType, field, value) => {
+        shiftReq[groupName][dayType][field] = Number(value) || 0;
+        renderTable(); 
+    };
+
+    window.handleReqToggle = (groupName, checked) => {
+        shiftReq[groupName].enabled = checked;
+        window.renderShiftReqForms();
+        renderTable();
+    };
+
+    window.renderGroupManagement = () => {
+      let html = `<div class="flex flex-wrap gap-2 items-center">`;
+      const groups = Object.keys(shiftReq).filter(g => g !== '');
+      
+      groups.forEach(g => {
+          html += `
+          <div class="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-1">
+              <input type="text" value="${g}" 
+                     onchange="window.handleRenameGroup('${g}', event.target.value)"
+                     class="bg-transparent font-bold text-sm w-20 text-center outline-none focus:bg-white focus:ring-1 ring-indigo-500 rounded px-1" />
+              <button onclick="window.handleDeleteGroup('${g}')" class="text-slate-400 hover:text-red-500 p-1 rounded transition-colors" title="削除">
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+          </div>`;
+      });
+      
+      html += `
+          <div class="flex items-center gap-1 ml-2">
+              <input type="text" id="new-group-input" placeholder="新グループ名" class="border border-slate-200 rounded-lg p-1 text-sm w-24 outline-none focus:ring-2 focus:ring-indigo-500" />
+              <button onclick="window.handleAddGroupBtn()" class="bg-slate-800 text-white p-1 rounded-lg hover:bg-slate-700 transition-colors" title="追加">
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+              </button>
+          </div>
+      `;
+      
+      html += `</div>`;
+      document.getElementById('group-management-content').innerHTML = html;
+      lucide.createIcons();
+    };
+
+    window.handleRenameGroup = (oldName, newName) => {
+        newName = newName.trim();
+        if (!newName || newName === oldName) {
+            window.renderGroupManagement();
+            return;
+        }
+        if (shiftReq[newName] || newName === '') {
+            alert('既に存在するグループ名です。');
+            window.renderGroupManagement();
+            return;
+        }
+        
+        // 順番を維持してオブジェクトのキーを変更する
+        const newShiftReq = {};
+        for (const key in shiftReq) {
+            if (key === oldName) {
+                newShiftReq[newName] = shiftReq[oldName];
+            } else {
+                newShiftReq[key] = shiftReq[key];
+            }
+        }
+        shiftReq = newShiftReq;
+        
+        staffs.forEach(s => {
+            if (s.group === oldName) s.group = newName;
+        });
+        
+        window.renderGroupManagement();
+        window.renderShiftReqForms();
+        window.renderStaffModal();
+        window.renderAddFormGroup();
+        renderTable();
+    };
+
+    window.handleDeleteGroup = (groupName) => {
+        if (confirm(`グループ「${groupName}」を削除しますか？\n所属しているスタッフは「なし」枠に変更されます。`)) {
+            delete shiftReq[groupName];
+            staffs.forEach(s => {
+                if (s.group === groupName) s.group = '';
+            });
+            window.renderGroupManagement();
+            window.renderShiftReqForms();
+            window.renderStaffModal();
+            window.renderAddFormGroup();
+            renderTable();
+        }
+    };
+
+    window.handleAddGroupBtn = () => {
+        const input = document.getElementById('new-group-input');
+        let newName = input.value.trim();
+        newName = newName.replace(/['"]/g, ''); // クォーテーションを除外
+        if (newName) {
+            if (shiftReq[newName] || newName === '') {
+                alert('既に存在するグループ名です。');
+                return;
+            }
+            shiftReq[newName] = {
+               enabled: true,
+               weekday: { min: 0, max: 10, 'A': 0, 'B': 0, '10': 0, '11': 0 },
+               weekend: { min: 0, max: 10, 'A': 0, 'B': 0, '10': 0, '11': 0 }
+            };
+            input.value = '';
+            window.renderGroupManagement();
+            window.renderShiftReqForms();
+            window.renderStaffModal();
+            window.renderAddFormGroup();
+            renderTable();
+        }
+    };
+
+    window.openStaffModal = () => {
+      window.renderGroupManagement();
+      renderStaffModal();
+      const modal = document.getElementById('staff-modal');
+      const panel = document.getElementById('staff-modal-panel');
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        panel.classList.remove('scale-95');
+      }, 10);
+    };
+
+    window.closeStaffModal = () => {
+      const modal = document.getElementById('staff-modal');
+      const panel = document.getElementById('staff-modal-panel');
+      modal.classList.add('opacity-0');
+      panel.classList.add('scale-95');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 200);
+    };
+
+    // 夜間担当設定モーダル
+    let selectedNightShiftDate = null;
+    window.openNightShiftModal = (dateStr) => {
+        selectedNightShiftDate = dateStr;
+        document.getElementById('night-shift-modal-desc').innerHTML = `<span class="text-indigo-600 font-black border-b-2 border-indigo-200">${dateStr.replace(/-/g, '/')}</span> を開始日として、<br>〇印をつける周期を選択してください。`;
+        
+        if (nightShiftConfig && nightShiftConfig.cycle) {
+            document.getElementById('night-shift-cycle-select').value = nightShiftConfig.cycle;
+        } else {
+            document.getElementById('night-shift-cycle-select').value = "3";
+        }
+
+        const modal = document.getElementById('night-shift-modal');
+        const panel = document.getElementById('night-shift-modal-panel');
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            panel.classList.remove('scale-95');
+        }, 10);
+    };
+
+    window.closeNightShiftModal = () => {
+        const modal = document.getElementById('night-shift-modal');
+        const panel = document.getElementById('night-shift-modal-panel');
+        modal.classList.add('opacity-0');
+        panel.classList.add('scale-95');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 200);
+    };
+
+    let currentColorTarget = null;
+
+    window.openCellColorPicker = (staffId, dateStr) => {
+        currentColorTarget = { type: 'cell', staffId, dateStr };
+        const staff = staffs.find(s => s.id === staffId);
+        const existingColor = (staff.cellColors && staff.cellColors[dateStr]) || colColors[dateStr] || '#ffcccc';
+        document.getElementById('color-picker-input').value = existingColor;
+        document.getElementById('color-picker-title').innerHTML = '<i data-lucide="palette" class="w-5 h-5 text-indigo-600"></i> セルの色を変更';
+        lucide.createIcons();
+        window.showColorPickerModal();
+    };
+
+    window.openColColorPicker = (dateStr) => {
+        currentColorTarget = { type: 'col', dateStr };
+        const existingColor = colColors[dateStr] || '#ffcccc';
+        document.getElementById('color-picker-input').value = existingColor;
+        document.getElementById('color-picker-title').innerHTML = '<i data-lucide="palette" class="w-5 h-5 text-indigo-600"></i> 列の色を変更';
+        lucide.createIcons();
+        window.showColorPickerModal();
+    };
+
+    window.openMemoColorPicker = (dateStr) => {
+        currentColorTarget = { type: 'memo', dateStr };
+        const existingColor = memoColors[dateStr] || colColors[dateStr] || '#ffcccc';
+        document.getElementById('color-picker-input').value = existingColor;
+        document.getElementById('color-picker-title').innerHTML = '<i data-lucide="palette" class="w-5 h-5 text-indigo-600"></i> メモ欄の色を変更';
+        lucide.createIcons();
+        window.showColorPickerModal();
+    };
+
+    window.showColorPickerModal = () => {
+        const modal = document.getElementById('color-picker-modal');
+        const panel = document.getElementById('color-picker-modal-panel');
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            panel.classList.remove('scale-95');
+        }, 10);
+    };
+
+    window.closeColorPicker = () => {
+        const modal = document.getElementById('color-picker-modal');
+        const panel = document.getElementById('color-picker-modal-panel');
+        modal.classList.add('opacity-0');
+        panel.classList.add('scale-95');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            currentColorTarget = null;
+        }, 200);
+    };
+
+    window.selectAndSaveColor = (color) => {
+        document.getElementById('color-picker-input').value = color;
+        window.saveColorSelection();
+    };
+
+    window.saveColorSelection = () => {
+        if (!currentColorTarget) return;
+        const color = document.getElementById('color-picker-input').value;
+        
+        if (currentColorTarget.type === 'cell') {
+            const staff = staffs.find(s => s.id === currentColorTarget.staffId);
+            if (staff) {
+                staff.cellColors = staff.cellColors || {};
+                staff.cellColors[currentColorTarget.dateStr] = color;
+            }
+        } else if (currentColorTarget.type === 'col') {
+            colColors[currentColorTarget.dateStr] = color;
+        } else if (currentColorTarget.type === 'memo') {
+            memoColors[currentColorTarget.dateStr] = color;
+        }
+        
+        window.closeColorPicker();
+        renderTable();
+    };
+
+    window.clearColorSelection = () => {
+        if (!currentColorTarget) return;
+        
+        if (currentColorTarget.type === 'cell') {
+            const staff = staffs.find(s => s.id === currentColorTarget.staffId);
+            if (staff && staff.cellColors) {
+                delete staff.cellColors[currentColorTarget.dateStr];
+            }
+        } else if (currentColorTarget.type === 'col') {
+            delete colColors[currentColorTarget.dateStr];
+        } else if (currentColorTarget.type === 'memo') {
+            delete memoColors[currentColorTarget.dateStr];
+        }
+        
+        window.closeColorPicker();
+        renderTable();
+    };
+
+    window.saveNightShift = () => {
+        const cycle = parseInt(document.getElementById('night-shift-cycle-select').value, 10);
+        nightShiftConfig = { startDate: selectedNightShiftDate, cycle: cycle };
+        window.closeNightShiftModal();
+        renderTable();
+    };
+
+    window.clearNightShift = () => {
+        nightShiftConfig = { startDate: null, cycle: null };
+        window.closeNightShiftModal();
+        renderTable();
+    };
+
+    window.showStaffSummary = (event, staffId) => {
+        event.stopPropagation();
+        const staff = staffs.find(s => s.id === staffId);
+        if (!staff) return;
+
+        let workTotal = 0;
+        let offTotal = 0;
+        let counts = {
+            'A': 0, 'B': 0, '10': 0, '11': 0, '休': 0, '有休': 0, 'otherWork': {}, 'otherOff': {}
+        };
+
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+            const mVal = staff.manualShifts[dateStr];
+            const autoVal = generatedShifts[dateStr] ? generatedShifts[dateStr][staff.id] : null;
+
+            let actualShift = null;
+            if (mVal) {
+                actualShift = mVal;
+            } else if (autoVal) {
+                actualShift = autoVal;
+            }
+
+            if (actualShift === '休' || actualShift === '有休') {
+                offTotal++;
+                if (counts[actualShift] !== undefined) {
+                    counts[actualShift]++;
+                } else {
+                    counts.otherOff[actualShift] = (counts.otherOff[actualShift] || 0) + 1;
+                }
+            } else if (actualShift) {
+                workTotal++;
+                if (counts[actualShift] !== undefined) {
+                    counts[actualShift]++;
+                } else {
+                    counts.otherWork[actualShift] = (counts.otherWork[actualShift] || 0) + 1;
+                }
+            }
+        }
+
+        let otherWorkHtml = Object.keys(counts.otherWork).map(k => `<div class="flex justify-center gap-3"><span class="text-slate-500 w-8 text-right">${k}</span><span class="font-bold text-slate-700 w-8 text-left">${counts.otherWork[k]}</span></div>`).join('');
+        let otherOffHtml = Object.keys(counts.otherOff).map(k => `<div class="flex justify-center gap-3"><span class="text-slate-500 w-8 text-right">${k}</span><span class="font-bold text-slate-700 w-8 text-left">${counts.otherOff[k]}</span></div>`).join('');
+
+        let html = `
+            <div class="font-bold text-slate-800 border-b border-slate-100 pb-1.5 mb-2 text-xs flex items-center justify-center gap-1.5">
+               <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-indigo-500"></i> ${staff.name}
+            </div>
+            <div class="flex flex-col gap-1.5 mb-2.5">
+                <div class="flex justify-between items-center bg-blue-50 rounded border border-blue-100 py-1 px-2.5">
+                    <span class="text-[10px] text-blue-600 font-bold">出勤</span>
+                    <span class="text-sm font-black text-blue-700">${workTotal}</span>
+                </div>
+                <div class="flex justify-between items-center bg-red-50 rounded border border-red-100 py-1 px-2.5">
+                    <span class="text-[10px] text-red-600 font-bold">休み</span>
+                    <span class="text-sm font-black text-red-700">${offTotal}</span>
+                </div>
+            </div>
+            <div class="text-[10px] space-y-0.5">
+                <div class="flex justify-center gap-3"><span class="text-slate-500 w-8 text-right">A</span><span class="font-bold text-slate-700 w-8 text-left">${counts['A']}</span></div>
+                <div class="flex justify-center gap-3"><span class="text-slate-500 w-8 text-right">10</span><span class="font-bold text-slate-700 w-8 text-left">${counts['10']}</span></div>
+                <div class="flex justify-center gap-3"><span class="text-slate-500 w-8 text-right">11</span><span class="font-bold text-slate-700 w-8 text-left">${counts['11']}</span></div>
+                <div class="flex justify-center gap-3"><span class="text-slate-500 w-8 text-right">B</span><span class="font-bold text-slate-700 w-8 text-left">${counts['B']}</span></div>
+                ${otherWorkHtml}
+                <div class="flex justify-center gap-3 mt-1.5 pt-1.5 border-t border-slate-100"><span class="text-slate-500 w-8 text-right">公休</span><span class="font-bold text-slate-700 w-8 text-left">${counts['休']}</span></div>
+                <div class="flex justify-center gap-3"><span class="text-slate-500 w-8 text-right">有休</span><span class="font-bold text-slate-700 w-8 text-left">${counts['有休']}</span></div>
+                ${otherOffHtml}
+            </div>
+        `;
+
+        const popup = document.getElementById('staff-summary-popup');
+        popup.innerHTML = html;
+        lucide.createIcons({ root: popup });
+        
+        popup.classList.remove('hidden');
+        
+        // サイズ計算のために一時的に表示してから位置を調整
+        const rect = event.currentTarget.getBoundingClientRect();
+        const popupRect = popup.getBoundingClientRect();
+        
+        let top = rect.top + window.scrollY + (rect.height / 2) - (popupRect.height / 2);
+        let left = rect.left + window.scrollX - popupRect.width - 10;
+        
+        // 画面外にはみ出ないように調整
+        if (top < window.scrollY + 10) top = window.scrollY + 10;
+        
+        popup.style.top = top + 'px';
+        popup.style.left = left + 'px';
+
+        setTimeout(() => {
+            popup.classList.remove('opacity-0', 'pointer-events-none');
+        }, 10);
+    };
+
+    // ポップアップの外側をクリックしたら閉じる処理
+    document.addEventListener('click', (e) => {
+        const popup = document.getElementById('staff-summary-popup');
+        if (popup && !popup.classList.contains('hidden') && !popup.contains(e.target)) {
+            popup.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                popup.classList.add('hidden');
+            }, 150);
+        }
+    });
+
+    function renderStaffModal() {
+      let html = `<div id="staff-sortable-list" class="space-y-3 pb-2">`;
+      staffs.forEach(staff => {
+        let typeColorClass = staff.type === '総合' ? 'bg-blue-500 text-white border-blue-600' : 'bg-yellow-400 text-slate-800 border-yellow-500';
+        
+        // 登録されているグループ一覧を動的に生成
+        const groupOptions = Object.keys(shiftReq).filter(g => g !== '').map(g => {
+            return `<option value="${g}" ${staff.group === g ? 'selected' : ''}>${g}</option>`;
+        }).join('');
+
+        html += `
+          <div data-id="${staff.id}" data-group="${staff.group}"
+               class="handle flex flex-wrap items-center justify-between p-2 md:p-3 bg-white border border-slate-200 rounded-xl hover:border-indigo-400 hover:shadow-md transition-all z-10 cursor-grab active:cursor-grabbing" title="ドラッグして順番を入れ替え">
+            
+            <div class="flex flex-wrap items-center gap-2 md:gap-3">
+              <div class="flex items-center gap-0.5 p-1 -ml-1 pointer-events-none">
+                <div class="text-slate-300 flex items-center justify-center shrink-0">
+                  <i data-lucide="grip-vertical" class="w-5 h-5"></i>
+                </div>
+                <div class="w-12 md:w-16 font-bold text-slate-700 truncate text-sm md:text-base">${staff.name}</div>
+              </div>
+              
+              <div class="flex items-center justify-center px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg" title="1人にしない">
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" class="sr-only peer" ${staff.needsFollowUp ? 'checked' : ''} onchange="updateStaffSetting('${staff.id}', 'needsFollowUp', this.checked)">
+                  <div class="w-7 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-500"></div>
+                </label>
+              </div>
+
+              <select onchange="updateStaffSetting('${staff.id}', 'type', event.target.value)" class="p-1 md:p-1.5 border rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-bold ${typeColorClass} cursor-pointer" title="雇用形態">
+                <option value="総合" ${staff.type === '総合' ? 'selected' : ''} class="bg-white text-slate-800 font-normal">総合</option>
+                <option value="一般(夜間なし)" ${staff.type === '一般(夜間なし)' ? 'selected' : ''} class="bg-white text-slate-800 font-normal">一般(夜間なし)</option>
+                <option value="一般(夜間あり)" ${staff.type === '一般(夜間あり)' ? 'selected' : ''} class="bg-white text-slate-800 font-normal">一般(夜間あり)</option>
+              </select>
+
+              <select onchange="updateStaffSetting('${staff.id}', 'group', event.target.value)" class="p-1 md:p-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 cursor-pointer" title="所属グループ">
+                <option value="" ${staff.group === '' ? 'selected' : ''}>なし</option>
+                ${groupOptions}
+              </select>
+
+              <select onchange="updateStaffSetting('${staff.id}', 'offPreference', event.target.value)" class="p-1 md:p-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-600 cursor-pointer" title="休みの傾向">
+                <option value="" ${staff.offPreference === '' ? 'selected' : ''}>なし</option>
+                <option value="単発" ${staff.offPreference === '単発' ? 'selected' : ''}>単発</option>
+                <option value="連続" ${staff.offPreference === '連続' ? 'selected' : ''}>連続</option>
+              </select>
+            </div>
+            
+            <button onclick="removeStaff('${staff.id}')" class="text-slate-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0" title="スタッフを削除">
+              <i data-lucide="trash" class="w-4 h-4 pointer-events-none"></i>
+            </button>
+          </div>
+        `;
+      });
+      html += `</div>`;
+      document.getElementById('staff-modal-content').innerHTML = html;
+      lucide.createIcons();
+
+      // SortableJSを使用して滑らかなスライドアニメーション付きのドラッグ＆ドロップを実装
+      const list = document.getElementById('staff-sortable-list');
+      if (list) {
+          if (window.staffSortable) {
+              window.staffSortable.destroy();
+          }
+          window.staffSortable = new Sortable(list, {
+              handle: '.handle', 
+              filter: 'select, button', // プルダウンやボタンの上ではドラッグを発動させない
+              preventOnFilter: false, // プルダウンやボタンが通常通りクリックできるようにする
+              animation: 1000, // さらにゆっくりに調整（1.0秒）
+              easing: "cubic-bezier(0.25, 1, 0.5, 1)", // ぬるっと滑らかに吸い付く動き
+              ghostClass: 'opacity-40', // 移動先のプレースホルダーを半透明に
+              dragClass: 'shadow-2xl', // 掴んでいる要素に強い影をつける
+              onMove: function (evt) {
+                  const draggedGroup = evt.dragged.getAttribute('data-group');
+                  const relatedGroup = evt.related.getAttribute('data-group');
+                  // 異なるグループ間への移動を視覚的にブロック（越えられないようにする）
+                  if (draggedGroup !== relatedGroup) {
+                      return false; 
+                  }
+              },
+              onEnd: function (evt) {
+                  const oldIndex = evt.oldIndex;
+                  const newIndex = evt.newIndex;
+                  
+                  if (newIndex === oldIndex) return;
+
+                  // 内部のデータ配列の順序を書き換える
+                  const movedItem = staffs.splice(oldIndex, 1)[0];
+                  staffs.splice(newIndex, 0, movedItem);
+                  
+                  // 表側(メイン画面)に新しい順番を反映
+                  renderTable();
+              }
+          });
+      }
+    }
+
+    window.updateStaffSetting = (staffId, key, value) => {
+      const staff = staffs.find(s => s.id === staffId);
+      if (staff) {
+        staff[key] = value;
+        if (key === 'group') {
+          staffs.sort((a, b) => a.group.localeCompare(b.group));
+        }
+        renderTable();
+        renderStaffModal();
+      }
+    };
+
+    window.highlightCol = (dateStr) => {
+      document.querySelectorAll(`.header-day-${dateStr}`).forEach(el => {
+        el.classList.add('brightness-[0.85]');
+      });
+    };
+
+    window.unhighlightCol = (dateStr) => {
+      document.querySelectorAll(`.header-day-${dateStr}`).forEach(el => {
+        el.classList.remove('brightness-[0.85]');
+      });
+    };
+
+    window.toggleMemoVisibility = () => {
+      isMemoVisible = !isMemoVisible;
+      renderTable();
+    };
+
+    // --- Handlers ---
+
+    window.handleMemoChange = (dateStr, value) => {
+        if (value.trim() === '') {
+            delete dailyMemos[dateStr];
+        } else {
+            // contenteditableで入り込む余分な末尾の改行を取り除く
+            dailyMemos[dateStr] = value.replace(/\n+$/, '');
+        }
+    };
+
+    window.handleSelectChange = (event, staffId, dateStr) => {
+      const val = event.target.value;
+      const staff = staffs.find(s => s.id === staffId);
+      if (!staff) return;
+
+      if (val === 'color') {
+        window.openCellColorPicker(staffId, dateStr);
+        event.target.value = staff.manualShifts[dateStr] || '';
+        return;
+      }
+
+      if (val === 'custom') {
+        const currentVal = staff.manualShifts[dateStr] || '';
+        const input = prompt('シフトを入力してください（例：14-18、遅番など）', currentVal);
+        if (input !== null && input.trim() !== '') {
+          staff.manualShifts[dateStr] = input.trim();
+        } else if (input !== null && input.trim() === '') {
+          delete staff.manualShifts[dateStr];
+        }
+      } else if (val === '') {
+        delete staff.manualShifts[dateStr];
+      } else {
+        staff.manualShifts[dateStr] = val;
+      }
+      
+      renderTable();
+    };
+
+    function changeMonth(delta) {
+      currentDate.setMonth(currentDate.getMonth() + delta);
+      renderMonthHeader();
+      renderTable();
+    }
+
+    function addStaff() {
+      const inputName = document.getElementById('input-staff-name');
+      const inputType = document.getElementById('input-staff-type');
+      const inputGroup = document.getElementById('input-staff-group');
+      const name = inputName.value.trim();
+      
+      if (name) {
+        staffs.push({ 
+          id: Date.now().toString(), 
+          name: name, 
+          type: inputType.value,
+          group: inputGroup.value,
+          needsFollowUp: true, 
+          manualShifts: {},
+          offPreference: '',
+          cellColors: {}
+        });
+        
+        staffs.sort((a, b) => a.group.localeCompare(b.group));
+        
+        inputName.value = '';
+        renderTable();
+      }
+    }
+
+    window.removeStaff = (id) => {
+      if(confirm('このスタッフを削除しますか？')) {
+        staffs = staffs.filter(s => s.id !== id);
+        renderTable();
+        renderStaffModal(); 
+      }
+    };
+
+    function generateShift() {
+      if (staffs.length === 0) return;
+      
+      const btnContent = document.getElementById('btn-generate-content');
+      btnContent.innerHTML = `<span class="animate-pulse">生成中...</span>`;
+      
+      setTimeout(() => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        const calendarDays = [];
+        let currentWeek = 0;
+        let weekendDaysCount = 0;
+        let weekendsOnlyCount = 0;
+        for (let i = 1; i <= daysInMonth; i++) {
+          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+          const dateObj = new Date(year, month, i);
+          const dayOfWeek = dateObj.getDay();
+          if (dayOfWeek === 0 && i !== 1) currentWeek++; 
+          
+          const holidayName = typeof JapaneseHolidays !== 'undefined' ? JapaneseHolidays.isHoliday(dateObj) : null;
+          const isHoliday = !!holidayName;
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6 || isHoliday;
+          if (isWeekend) weekendDaysCount++; 
+          if (dayOfWeek === 0 || dayOfWeek === 6) weekendsOnlyCount++;
+
+          // 夜間担当日かどうかを判定
+          let isNightShiftDay = false;
+          if (nightShiftConfig.startDate && nightShiftConfig.cycle) {
+              const startObj = new Date(nightShiftConfig.startDate);
+              const diffTime = dateObj.getTime() - startObj.getTime();
+              const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+              if (diffDays >= 0 && diffDays % nightShiftConfig.cycle === 0) {
+                  isNightShiftDay = true;
+              }
+          }
+
+          calendarDays.push({ dateStr, isWeekend, weekNumber: currentWeek, dayOfWeek, isNightShiftDay, isHoliday, holidayName });
+        }
+
+        // --- 追加：前月からの引き継ぎ情報を取得する関数 ---
+        const getShiftVal = (staff, dStr) => {
+            const mVal = staff.manualShifts[dStr];
+            if (mVal && mVal !== '休' && mVal !== '有休') return mVal;
+            if (mVal === '休' || mVal === '有休') return '休';
+            if (generatedShifts[dStr] && generatedShifts[dStr][staff.id] && generatedShifts[dStr][staff.id] !== '休') return generatedShifts[dStr][staff.id];
+            if (generatedShifts[dStr] && generatedShifts[dStr][staff.id] === '休') return '休';
+            return null; // データなし
+        };
+
+        const prevMonthDays = [];
+        const firstDayOfWeek = new Date(year, month, 1).getDay();
+        const daysToLookBack = Math.max(6, firstDayOfWeek); 
+        
+        for (let i = daysToLookBack; i > 0; i--) {
+            const d = new Date(year, month, 1 - i);
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            prevMonthDays.push({
+                dateStr: dateStr,
+                dayOfWeek: d.getDay()
+            });
+        }
+
+        let bestShift = null;
+        let minScore = Infinity;
+
+        // 探索回数を増やし、より確実なシフトを見つける
+        for (let trial = 0; trial < 2000; trial++) {
+          const currentShift = {};
+          calendarDays.forEach(d => currentShift[d.dateStr] = {});
+
+          let trialPenalty = 0;
+
+          // 1. 各スタッフごとに「休」と「出勤」を生成
+          staffs.forEach(staff => {
+            let validOffsFound = false;
+            let attempts = 0;
+            let bestAutoOffs = [];
+            let minScoreForOffs = Infinity;
+
+            // 休みの配置が5連勤以下（総合はさらに任意の7日間出勤5日以内）になるように最大30回リトライして探す
+            while (!validOffsFound && attempts < 30) {
+              attempts++;
+              let assignedAutoOffs = [];
+
+              if (staff.type === '総合') {
+                const weeks = [...new Set(calendarDays.map(d => d.weekNumber))];
+                weeks.forEach(week => {
+                  const daysInWeek = calendarDays.filter(d => d.weekNumber === week);
+                  const targetOff = daysInWeek.filter(d => d.dayOfWeek === 0 || d.dayOfWeek === 6).length;
+
+                  const emptyDays = [];
+                  let manualOffCount = 0;
+
+                  daysInWeek.forEach(d => {
+                    const val = staff.manualShifts[d.dateStr];
+                    if (!val) {
+                      emptyDays.push(d.dateStr); 
+                    } else if (val === '休') {
+                      manualOffCount++; 
+                    }
+                  });
+
+                  let autoOffCount = targetOff - manualOffCount;
+                  if (autoOffCount < 0) autoOffCount = 0;
+                  if (autoOffCount > emptyDays.length) autoOffCount = emptyDays.length;
+
+                  // ランダムに並び替え
+                  for (let i = emptyDays.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [emptyDays[i], emptyDays[j]] = [emptyDays[j], emptyDays[i]];
+                  }
+
+                  assignedAutoOffs.push(...emptyDays.slice(0, autoOffCount));
+                });
+              } else {
+                const targetOff = 10;
+                const emptyDaysByWeek = {};
+                const weeks = [...new Set(calendarDays.map(d => d.weekNumber))];
+                
+                let manualOffCount = 0;
+                calendarDays.forEach(d => {
+                  const val = staff.manualShifts[d.dateStr];
+                  if (val === '休') manualOffCount++;
+                });
+
+                let autoOffCount = targetOff - manualOffCount;
+                if (autoOffCount < 0) autoOffCount = 0;
+
+                weeks.forEach(w => emptyDaysByWeek[w] = []);
+                
+                calendarDays.forEach(d => {
+                  if (!staff.manualShifts[d.dateStr]) {
+                    emptyDaysByWeek[d.weekNumber].push(d.dateStr);
+                  }
+                });
+
+                let tempAssignedAutoOffs = [];
+                weeks.forEach(w => {
+                  let days = emptyDaysByWeek[w];
+                  days.sort(() => Math.random() - 0.5);
+                  let take = Math.min(2, days.length);
+                  for(let i=0; i<take; i++){
+                    tempAssignedAutoOffs.push(days[i]);
+                  }
+                });
+
+                while (tempAssignedAutoOffs.length > autoOffCount) {
+                  const idx = Math.floor(Math.random() * tempAssignedAutoOffs.length);
+                  tempAssignedAutoOffs.splice(idx, 1);
+                }
+
+                const remainingEmpty = [];
+                calendarDays.forEach(d => {
+                  if (!staff.manualShifts[d.dateStr] && !tempAssignedAutoOffs.includes(d.dateStr)) {
+                    remainingEmpty.push(d.dateStr);
+                  }
+                });
+                
+                remainingEmpty.sort(() => Math.random() - 0.5);
+
+                while (tempAssignedAutoOffs.length < autoOffCount && remainingEmpty.length > 0) {
+                  tempAssignedAutoOffs.push(remainingEmpty.pop());
+                }
+
+                assignedAutoOffs = tempAssignedAutoOffs;
+              }
+
+              // 連勤と7日間の出勤日数の事前チェック
+              let maxConsecutive = 0;
+              let currentConsecutive = 0;
+              let maxWorkIn7Days = 0;
+
+              // --- 前月分の連勤を計算 ---
+              for (const pd of prevMonthDays) {
+                  const sVal = getShiftVal(staff, pd.dateStr);
+                  if (sVal && sVal !== '休') {
+                      currentConsecutive++;
+                  } else {
+                      currentConsecutive = 0; 
+                  }
+              }
+              const initialConsecutive = currentConsecutive;
+              maxConsecutive = initialConsecutive;
+              
+              const simulatedStatus = calendarDays.map(d => {
+                const mVal = staff.manualShifts[d.dateStr];
+                const isAutoOff = assignedAutoOffs.includes(d.dateStr);
+                return (mVal === '休' || mVal === '有休' || isAutoOff) ? '休' : '出';
+              });
+
+              simulatedStatus.forEach((status) => {
+                if (status === '出') {
+                  currentConsecutive++;
+                  if (currentConsecutive > maxConsecutive) {
+                    maxConsecutive = currentConsecutive;
+                  }
+                } else {
+                  currentConsecutive = 0;
+                }
+              });
+
+              if (staff.type === '総合') {
+                const combinedStatus = [];
+                const recentPrevDays = prevMonthDays.slice(-6);
+                recentPrevDays.forEach(pd => {
+                    const sVal = getShiftVal(staff, pd.dateStr);
+                    combinedStatus.push((sVal && sVal !== '休') ? '出' : '休');
+                });
+                combinedStatus.push(...simulatedStatus);
+
+                for (let i = 0; i <= combinedStatus.length - 7; i++) {
+                  let workIn7 = 0;
+                  for (let j = 0; j < 7; j++) {
+                    if (combinedStatus[i + j] === '出') workIn7++;
+                  }
+                  if (workIn7 > maxWorkIn7Days) maxWorkIn7Days = workIn7;
+                }
+              }
+
+              // スコア計算：連勤が少ない＆7日間出勤が少ない方が良い
+              let offScore = maxConsecutive + (staff.type === '総合' ? maxWorkIn7Days : 0);
+              if (offScore < minScoreForOffs) {
+                minScoreForOffs = offScore;
+                bestAutoOffs = [...assignedAutoOffs];
+              }
+
+              if (staff.type === '総合') {
+                if (maxConsecutive <= 5 && maxWorkIn7Days <= 5) {
+                  validOffsFound = true;
+                }
+              } else {
+                if (maxConsecutive <= 5) {
+                  validOffsFound = true;
+                }
+              }
+            } // end while
+
+            // 決定した休みの反映
+            bestAutoOffs.forEach(dateStr => {
+              currentShift[dateStr][staff.id] = '休';
+            });
+            calendarDays.forEach(d => {
+              if (!staff.manualShifts[d.dateStr] && currentShift[d.dateStr][staff.id] !== '休') {
+                currentShift[d.dateStr][staff.id] = 'WORK';
+              }
+            });
+          });
+
+          // --- 追加: 1.5 各グループの出勤数が設定した上限(max)を超えないように強制調整 ---
+          // 他の日へ振り替えた際に上限を超えるのを防ぐため、ループで完全に収束させる
+          let needsAdjustment = true;
+          let adjustLoop = 0;
+          while (needsAdjustment && adjustLoop < 5) {
+             needsAdjustment = false;
+             calendarDays.forEach(d => {
+                 const groups = Object.keys(shiftReq); // 動的に全グループを取得
+                 groups.forEach(groupName => {
+                     // 設定が無効な場合はスキップ
+                     if (shiftReq[groupName].enabled === false) return;
+
+                     const reqObj = d.isWeekend ? shiftReq[groupName].weekend : shiftReq[groupName].weekday;
+                     const maxCount = reqObj.max;
+
+                     let autoWorkers = staffs.filter(s => s.group === groupName && !s.manualShifts[d.dateStr] && currentShift[d.dateStr][s.id] === 'WORK');
+                     let manualWorkers = staffs.filter(s => s.group === groupName && s.manualShifts[d.dateStr] && !['休', '有休'].includes(s.manualShifts[d.dateStr]));
+                     let totalCount = autoWorkers.length + manualWorkers.length;
+
+                     // ランダムに入れ替え対象を選ぶ
+                     autoWorkers.sort(() => Math.random() - 0.5); 
+
+                     while (totalCount > maxCount && autoWorkers.length > 0) {
+                         needsAdjustment = true;
+                         const targetStaff = autoWorkers.pop();
+                         // 強制的に休みにする
+                         currentShift[d.dateStr][targetStaff.id] = '休';
+                         
+                         // 休日数の帳尻を合わせるため、上限に余裕がある別の「休」を1日選んで出勤(WORK)にする
+                         let offDays = calendarDays.filter(day => {
+                             if (targetStaff.manualShifts[day.dateStr] || currentShift[day.dateStr][targetStaff.id] !== '休') return false;
+                             
+                             // 振替先の日の現在の出勤人数が上限未満であることを確認
+                             const reqObjSwap = day.isWeekend ? shiftReq[groupName].weekend : shiftReq[groupName].weekday;
+                             let autoW = staffs.filter(s => s.group === groupName && !s.manualShifts[day.dateStr] && currentShift[day.dateStr][s.id] === 'WORK');
+                             let manW = staffs.filter(s => s.group === groupName && s.manualShifts[day.dateStr] && !['休', '有休'].includes(s.manualShifts[day.dateStr]));
+                             return (autoW.length + manW.length) < reqObjSwap.max;
+                         });
+
+                         if (offDays.length > 0) {
+                             // なるべく平日に振り替える
+                             let weekdays = offDays.filter(day => !day.isWeekend);
+                             let candidates = weekdays.length > 0 ? weekdays : offDays;
+                             const swapDay = candidates[Math.floor(Math.random() * candidates.length)];
+                             currentShift[swapDay.dateStr][targetStaff.id] = 'WORK';
+                             totalCount--;
+                         } else {
+                             // 振替先が見つからない場合は、休日数オーバーを防ぐため元に戻す（max超過ペナルティを受け入れる）
+                             currentShift[d.dateStr][targetStaff.id] = 'WORK';
+                         }
+                     }
+                 });
+             });
+             adjustLoop++;
+          }
+
+          // 2. 各日ごとに「WORK」になっている人に、設定したA/B/10の必要人数を賢く割り当てる
+          calendarDays.forEach((d, dayIndex) => {
+             // 動的に全グループを取得（なし枠は最後に処理するため分ける）
+             const groups = Object.keys(shiftReq).filter(g => g !== '');
+             groups.push(''); // 最後に空文字(なし枠)を追加
+             
+             groups.forEach(groupName => {
+                 if (shiftReq[groupName].enabled === false) return;
+
+                 const reqObj = d.isWeekend ? shiftReq[groupName].weekend : shiftReq[groupName].weekday;
+                 
+                 let manualA = 0, manualB = 0, manual10 = 0, manual11 = 0;
+                 staffs.forEach(s => {
+                   if (s.group !== groupName) return;
+                   const mVal = s.manualShifts[d.dateStr];
+                   if (mVal === 'A') manualA++;
+                   else if (mVal === 'B') manualB++;
+                   else if (mVal === '10') manual10++;
+                   else if (mVal === '11') manual11++;
+                 });
+
+                 let needA = Math.max(0, reqObj['A'] - manualA);
+                 let needB = Math.max(0, reqObj['B'] - manualB);
+                 let need10 = Math.max(0, reqObj['10'] - manual10);
+                 let need11 = Math.max(0, (reqObj['11'] || 0) - manual11);
+
+                 let workStaffIds = staffs.filter(s => s.group === groupName && currentShift[d.dateStr][s.id] === 'WORK').map(s => s.id);
+                 workStaffIds.sort(() => Math.random() - 0.5); // シャッフル
+
+                 // 前日のシフト情報を取得する関数
+                 const getPrevShift = (id) => {
+                    if (dayIndex === 0) {
+                        const prevDateStr = prevMonthDays[prevMonthDays.length - 1].dateStr;
+                        const manual = staffs.find(s=>s.id===id).manualShifts[prevDateStr];
+                        if (manual && ['A','B','10','11'].includes(manual)) return manual;
+                        if (generatedShifts[prevDateStr] && generatedShifts[prevDateStr][id]) {
+                            const auto = generatedShifts[prevDateStr][id];
+                            if (['A','B','10','11'].includes(auto)) return auto;
+                        }
+                        return null;
+                    }
+                    const prevDateStr = calendarDays[dayIndex - 1].dateStr;
+                    const manual = staffs.find(s=>s.id===id).manualShifts[prevDateStr];
+                    if (manual && ['A','B','10','11'].includes(manual)) return manual;
+                    const auto = currentShift[prevDateStr][id];
+                    if (auto && ['A','B','10','11'].includes(auto)) return auto;
+                    return null; // 前日が休みや有休等の場合
+                 };
+
+                 // (1) できるだけ前日と同じシフトに割り当てる
+                 let remaining1 = [];
+                 workStaffIds.forEach(id => {
+                    const p = getPrevShift(id);
+                    if (p === 'A' && needA > 0) { currentShift[d.dateStr][id] = 'A'; needA--; }
+                    else if (p === 'B' && needB > 0) { currentShift[d.dateStr][id] = 'B'; needB--; }
+                    else if (p === '10' && need10 > 0) { currentShift[d.dateStr][id] = '10'; need10--; }
+                    else if (p === '11' && need11 > 0) { currentShift[d.dateStr][id] = '11'; need11--; }
+                    else { remaining1.push(id); }
+                 });
+
+                 // (2) 順行変化（A->10->11->B）を許容して割り当てる
+                 let remaining2 = [];
+                 remaining1.forEach(id => {
+                    const p = getPrevShift(id);
+                    if (p === 'A') {
+                        if (need10 > 0) { currentShift[d.dateStr][id] = '10'; need10--; }
+                        else if (need11 > 0) { currentShift[d.dateStr][id] = '11'; need11--; }
+                        else if (needB > 0) { currentShift[d.dateStr][id] = 'B'; needB--; }
+                        else { remaining2.push(id); }
+                    } else if (p === '10') {
+                        if (need11 > 0) { currentShift[d.dateStr][id] = '11'; need11--; }
+                        else if (needB > 0) { currentShift[d.dateStr][id] = 'B'; needB--; }
+                        else { remaining2.push(id); }
+                    } else if (p === '11') {
+                        if (needB > 0) { currentShift[d.dateStr][id] = 'B'; needB--; }
+                        else { remaining2.push(id); }
+                    } else {
+                        remaining2.push(id); // 前日Bの人など
+                    }
+                 });
+
+                 // (3) 前日が休みの人（制約なし）を割り当てる
+                 let remaining3 = [];
+                 remaining2.forEach(id => {
+                    const p = getPrevShift(id);
+                    if (!p) {
+                        if (needA > 0) { currentShift[d.dateStr][id] = 'A'; needA--; }
+                        else if (need10 > 0) { currentShift[d.dateStr][id] = '10'; need10--; }
+                        else if (need11 > 0) { currentShift[d.dateStr][id] = '11'; need11--; }
+                        else if (needB > 0) { currentShift[d.dateStr][id] = 'B'; needB--; }
+                        else { remaining3.push(id); }
+                    } else {
+                        remaining3.push(id);
+                    }
+                 });
+
+                 // (4) 必要枠を無理やり埋める、または余った人に割り当てる
+                 remaining3.forEach(id => {
+                     const p = getPrevShift(id);
+                     if (needA > 0) { currentShift[d.dateStr][id] = 'A'; needA--; }
+                     else if (need10 > 0) { currentShift[d.dateStr][id] = '10'; need10--; }
+                     else if (need11 > 0) { currentShift[d.dateStr][id] = '11'; need11--; }
+                     else if (needB > 0) { currentShift[d.dateStr][id] = 'B'; needB--; }
+                     else {
+                         // 必要人数は満たしたので、余りはなるべく逆行しないようにする
+                         if (p === 'A') currentShift[d.dateStr][id] = 'A';
+                         else if (p === '10') currentShift[d.dateStr][id] = (Math.random() < 0.5) ? '10' : '11';
+                         else if (p === '11') currentShift[d.dateStr][id] = (Math.random() < 0.5) ? '11' : 'B';
+                         else if (p === 'B') currentShift[d.dateStr][id] = 'B';
+                         else {
+                             const st = ['A', 'B', '10', '11'];
+                             currentShift[d.dateStr][id] = st[Math.floor(Math.random() * st.length)];
+                         }
+                     }
+                 });
+             });
+
+             // 設定が無効な場合のスタッフの割り当て処理（ランダムフォールバック）
+             const disabledGroups = Object.keys(shiftReq).filter(g => shiftReq[g].enabled === false);
+             if (disabledGroups.length > 0) {
+                 let workStaffIdsOffGroup = staffs.filter(s => disabledGroups.includes(s.group) && currentShift[d.dateStr][s.id] === 'WORK').map(s => s.id);
+                 const getPrevShiftNoGroup = (id) => {
+                    if (dayIndex === 0) return null;
+                    const prevDateStr = calendarDays[dayIndex - 1].dateStr;
+                    const manual = staffs.find(s=>s.id===id).manualShifts[prevDateStr];
+                    if (manual && ['A','B','10','11'].includes(manual)) return manual;
+                    const auto = currentShift[prevDateStr][id];
+                    if (auto && ['A','B','10','11'].includes(auto)) return auto;
+                    return null;
+                 };
+                 workStaffIdsOffGroup.forEach(id => {
+                     const p = getPrevShiftNoGroup(id);
+                     if (p === 'A') currentShift[d.dateStr][id] = (Math.random() < 0.5) ? 'A' : '10';
+                     else if (p === '10') currentShift[d.dateStr][id] = (Math.random() < 0.5) ? '10' : '11';
+                     else if (p === '11') currentShift[d.dateStr][id] = (Math.random() < 0.5) ? '11' : 'B';
+                     else if (p === 'B') currentShift[d.dateStr][id] = 'B';
+                     else {
+                         const st = ['A', 'B', '10', '11'];
+                         currentShift[d.dateStr][id] = st[Math.floor(Math.random() * st.length)];
+                     }
+                 });
+             }
+
+             // 夜間担当の日は必ず総合のスタッフが最低1人「B」になるように調整
+             if (d.isNightShiftDay) {
+                 let hasSogoB = false;
+                 staffs.forEach(s => {
+                     if (s.type === '総合') {
+                         const mVal = s.manualShifts[d.dateStr];
+                         const autoVal = currentShift[d.dateStr][s.id];
+                         if (mVal === 'B' || autoVal === 'B') {
+                             hasSogoB = true;
+                         }
+                     }
+                 });
+
+                 if (!hasSogoB) {
+                     // 総合のスタッフで、その日に出勤（自動割り当て）している人を集める
+                     let workingSogoIds = staffs.filter(s => {
+                         if (s.type !== '総合') return false;
+                         const mVal = s.manualShifts[d.dateStr];
+                         // 手動で固定されている人は上書きしない
+                         if (mVal) return false; 
+                         const autoVal = currentShift[d.dateStr][s.id];
+                         if (autoVal === '休') return false;
+                         return true;
+                     }).map(s => s.id);
+
+                     if (workingSogoIds.length > 0) {
+                         // まず一人で任せられる人(needsFollowUp === false)を優先して探す
+                         let preferredIds = workingSogoIds.filter(id => {
+                             const needsFollowUp = staffs.find(st => st.id === id).needsFollowUp;
+                             return !needsFollowUp;
+                         });
+                         let targetList = preferredIds.length > 0 ? preferredIds : workingSogoIds;
+                         // ランダムに1人選んで強制的にBにする
+                         const targetId = targetList[Math.floor(Math.random() * targetList.length)];
+                         currentShift[d.dateStr][targetId] = 'B';
+                     } else {
+                         // 総合の出勤者が誰もいない場合は重いペナルティを与え、別のシフト構成を探させる
+                         trialPenalty += 50000;
+                     }
+                 }
+             }
+          });
+
+          // 3. 各種ペナルティ計算
+          staffs.forEach(staff => {
+            let consecutive = 0;
+            let prevShiftType = null;
+            let nightShiftBCount = 0;
+
+            // 前月末の連勤とシフトタイプを計算
+            for (const pd of prevMonthDays) {
+                const sVal = getShiftVal(staff, pd.dateStr);
+                if (sVal && sVal !== '休') {
+                    consecutive++;
+                    if (['A', 'B', '10', '11'].includes(sVal)) {
+                        prevShiftType = sVal;
+                    }
+                } else if (sVal === '休' || sVal === null) {
+                    consecutive = 0;
+                    prevShiftType = null;
+                }
+            }
+
+            calendarDays.forEach(d => {
+              const mVal = staff.manualShifts[d.dateStr];
+              const autoVal = currentShift[d.dateStr][staff.id];
+              
+              let actualShift = null;
+              if (mVal && mVal !== '休' && mVal !== '有休') {
+                  actualShift = mVal;
+              } else if (autoVal && autoVal !== '休') {
+                  actualShift = autoVal;
+              }
+
+              if (d.isNightShiftDay && actualShift === 'B') {
+                  nightShiftBCount++;
+              }
+
+              if (actualShift) {
+                consecutive++;
+                
+                // 【超重要】6連勤以上は絶対に組まないようにする特大ペナルティ
+                if (consecutive > 5) {
+                  trialPenalty += 2000000000 * (consecutive - 5); // 20億のペナルティで絶対阻止
+                }
+
+                // シフト時間逆行のペナルティ (BからAに戻るなど)
+                if (prevShiftType) {
+                    const valMap = { 'A': 0, '10': 1, '11': 2, 'B': 3 };
+                    const prevVal = valMap[prevShiftType];
+                    const currVal = valMap[actualShift];
+                    
+                    if (prevVal !== undefined && currVal !== undefined) {
+                        if (currVal < prevVal) {
+                            trialPenalty += 2000; // 逆行は強いペナルティ
+                        } else if (currVal > prevVal) {
+                            trialPenalty += 50;   // 順行変化でもできれば同じシフトが良いので軽いペナルティ
+                        }
+                    }
+                }
+                
+                // 次の日の判定のために記録
+                if (['A', 'B', '10', '11'].includes(actualShift)) {
+                    prevShiftType = actualShift;
+                } else {
+                    prevShiftType = null;
+                }
+
+              } else {
+                consecutive = 0;
+                prevShiftType = null; // 休みを挟んだら順序をリセット
+              }
+            });
+
+            // 第0週（月跨ぎの週）の前月分の実績を計算
+            let prevMonthWorkCountInWeek0 = 0;
+            let prevMonthOffCountInWeek0 = 0;
+            if (firstDayOfWeek > 0) {
+                const week0PrevDays = prevMonthDays.slice(-firstDayOfWeek);
+                week0PrevDays.forEach(pd => {
+                    const sVal = getShiftVal(staff, pd.dateStr);
+                    if (sVal && sVal !== '休') prevMonthWorkCountInWeek0++;
+                    else prevMonthOffCountInWeek0++;
+                });
+            }
+
+            // 週ごとの休み日数・出勤日数のペナルティ
+            const weeks = [...new Set(calendarDays.map(d => d.weekNumber))];
+            weeks.forEach(week => {
+              const daysInThisWeek = calendarDays.filter(d => d.weekNumber === week);
+              let daysCount = daysInThisWeek.length;
+              let workCountThisWeek = 0;
+              
+              daysInThisWeek.forEach(d => {
+                const mVal = staff.manualShifts[d.dateStr];
+                const isAutoWorking = currentShift[d.dateStr][staff.id] && currentShift[d.dateStr][staff.id] !== '休';
+                const isWorking = (mVal && mVal !== '休' && mVal !== '有休') || isAutoWorking;
+                if (isWorking) {
+                  workCountThisWeek++;
+                }
+              });
+              
+              let offCountThisWeek = daysCount - workCountThisWeek;
+
+              // 第0週の場合は前月分を足す
+              if (week === 0 && firstDayOfWeek > 0) {
+                  daysCount += firstDayOfWeek; // 7日になる
+                  workCountThisWeek += prevMonthWorkCountInWeek0;
+                  offCountThisWeek += prevMonthOffCountInWeek0;
+              }
+
+              if (staff.type.includes('一般')) {
+                if (daysCount >= 4) {
+                  if (offCountThisWeek < 2) trialPenalty += 5000 * (2 - offCountThisWeek); 
+                  if (offCountThisWeek > 3) trialPenalty += 5000 * (offCountThisWeek - 3);
+                }
+              } else {
+                if (workCountThisWeek > 5) {
+                  trialPenalty += 100000 * (workCountThisWeek - 5); // 総合の週休2日を絶対厳守
+                }
+              }
+            });
+
+            // --- 追加: 任意の連続する7日間での出勤日数チェック（総合の週休2日確保） ---
+            if (staff.type === '総合') {
+              const combinedDays = [];
+              const recentPrevDays = prevMonthDays.slice(-6);
+              recentPrevDays.forEach(pd => combinedDays.push({
+                  dateStr: pd.dateStr,
+                  isPrev: true
+              }));
+              calendarDays.forEach(d => combinedDays.push({
+                  dateStr: d.dateStr,
+                  isPrev: false
+              }));
+
+              for (let i = 0; i <= combinedDays.length - 7; i++) {
+                let workIn7Days = 0;
+                for (let j = 0; j < 7; j++) {
+                  const dayObj = combinedDays[i + j];
+                  let isWorking = false;
+                  if (dayObj.isPrev) {
+                      const sVal = getShiftVal(staff, dayObj.dateStr);
+                      isWorking = (sVal && sVal !== '休');
+                  } else {
+                      const mVal = staff.manualShifts[dayObj.dateStr];
+                      const autoVal = currentShift[dayObj.dateStr][staff.id];
+                      isWorking = (mVal && mVal !== '休' && mVal !== '有休') || (!mVal && autoVal !== '休');
+                  }
+                  if (isWorking) {
+                    workIn7Days++;
+                  }
+                }
+                // 7日間で6日以上出勤している場合はペナルティ（絶対厳守）
+                if (workIn7Days > 5) {
+                  trialPenalty += 100000 * (workIn7Days - 5); 
+                }
+              }
+            }
+
+            // 夜間担当日「B」シフトの回数制限・割合調整 (総合 ＞ 一般(夜間あり))
+            if (staff.type === '総合') {
+              // 総合は月1回〜3回を目標
+              if (nightShiftBCount < 1) {
+                trialPenalty += 3000 * (1 - nightShiftBCount);
+              } else if (nightShiftBCount > 3) {
+                trialPenalty += 3000 * (nightShiftBCount - 3);
+              }
+            } else if (staff.type === '一般(夜間あり)') {
+              // 一般(夜間あり)は月1回〜2回を目標
+              if (nightShiftBCount < 1) {
+                trialPenalty += 2000 * (1 - nightShiftBCount);
+              } else if (nightShiftBCount > 2) {
+                trialPenalty += 3000 * (nightShiftBCount - 2);
+              }
+            }
+
+            // 休みの傾向（単発休・連休）のペナルティ (優先度低め)
+            if (staff.offPreference) {
+                let dailyStatus = calendarDays.map(d => {
+                    const mVal = staff.manualShifts[d.dateStr];
+                    const autoVal = currentShift[d.dateStr][staff.id];
+                    let isOff = false;
+                    if (mVal && (mVal === '休' || mVal === '有休')) {
+                        isOff = true;
+                    } else if (!mVal && autoVal === '休') {
+                        isOff = true;
+                    }
+                    return isOff;
+                });
+
+                let offGroups = [];
+                let currentOffLen = 0;
+                dailyStatus.forEach(isOff => {
+                    if (isOff) {
+                        currentOffLen++;
+                    } else {
+                        if (currentOffLen > 0) {
+                            offGroups.push(currentOffLen);
+                            currentOffLen = 0;
+                        }
+                    }
+                });
+                if (currentOffLen > 0) {
+                    offGroups.push(currentOffLen);
+                }
+
+                if (staff.offPreference === '単発') {
+                    offGroups.forEach(len => {
+                        if (len >= 2) {
+                            trialPenalty += 100 * (len - 1); // 連休になっていると軽いペナルティ
+                        }
+                    });
+                } else if (staff.offPreference === '連続') {
+                    offGroups.forEach(len => {
+                        if (len === 1) {
+                            trialPenalty += 100; // 単発休になっていると軽いペナルティ
+                        }
+                    });
+                }
+            }
+          });
+
+          // 4. 全体の人数不足・過剰ペナルティ計算
+          calendarDays.forEach(d => {
+            const groups = Object.keys(shiftReq);
+            groups.forEach(groupName => {
+              if (shiftReq[groupName].enabled === false) return;
+
+              const reqObj = d.isWeekend ? shiftReq[groupName].weekend : shiftReq[groupName].weekday;
+              const reqTotal = reqObj['A'] + reqObj['B'] + reqObj['10'] + (reqObj['11'] || 0);
+              
+              let assignedCount = 0;
+              
+              staffs.forEach(s => {
+                if (s.group !== groupName) return;
+                const mVal = s.manualShifts[d.dateStr];
+                if (mVal && mVal !== '休' && mVal !== '有休') {
+                  assignedCount++;
+                } else if (currentShift[d.dateStr][s.id] && currentShift[d.dateStr][s.id] !== '休') {
+                  assignedCount++;
+                }
+              });
+
+              // 絶対条件（最大値・最小値のペナルティ）
+              if (assignedCount > reqObj.max) {
+                trialPenalty += (assignedCount - reqObj.max) * 100000000;
+              }
+              if (assignedCount < reqObj.min) {
+                trialPenalty += (reqObj.min - assignedCount) * 100000000;
+              }
+
+              // 設定した目標内訳人数(A, B, 10の合計)を満たしていない場合のペナルティ
+              if (assignedCount < reqTotal) {
+                trialPenalty += (reqTotal - assignedCount) * 10000;
+              } else {
+                // 超過ペナルティ
+                const excessPenaltyWeight = d.isWeekend ? 1000000 : 1;
+                trialPenalty += Math.pow(assignedCount - reqTotal, 2) * excessPenaltyWeight;
+              }
+            });
+
+            // 「一人にしない」の同伴ペナルティ (絶対厳守)
+            const shiftTypes = ['A', 'B', '10', '11'];
+            shiftTypes.forEach(shiftType => {
+                let hasNeedsFollowUp = false;
+                let hasIndependent = false;
+                
+                staffs.forEach(s => {
+                  const mVal = s.manualShifts[d.dateStr];
+                  const autoVal = currentShift[d.dateStr][s.id];
+                  let actualShift = null;
+                  if (mVal && mVal !== '休' && mVal !== '有休') {
+                    actualShift = mVal;
+                  } else if (autoVal && autoVal !== '休') {
+                    actualShift = autoVal;
+                  }
+                  
+                  if (actualShift === shiftType) {
+                    if (s.needsFollowUp) hasNeedsFollowUp = true;
+                    else hasIndependent = true;
+                  }
+                });
+                
+                // 同じシフトに「一人にしない(オン)」の人がいるのに、「一人でOK(オフ)」の人がいない場合は超特大ペナルティ
+                if (hasNeedsFollowUp && !hasIndependent) {
+                  trialPenalty += 500000000; // 5億のペナルティで強力に阻止
+                }
+            });
+          });
+
+          // --- 追加: 週ごとの出勤人数の平準化ペナルティ（平日・土日を分けて計算） ---
+          const weeksList = [...new Set(calendarDays.map(d => d.weekNumber))];
+          weeksList.forEach(week => {
+             const daysInThisWeek = calendarDays.filter(d => d.weekNumber === week);
+             
+             const groups = Object.keys(shiftReq);
+             groups.forEach(groupName => {
+                 if (shiftReq[groupName].enabled === false) return;
+
+                 let weekdayCounts = [];
+                 let weekendCounts = [];
+                 
+                 daysInThisWeek.forEach(d => {
+                     let assignedCount = 0;
+                     staffs.forEach(s => {
+                         if (s.group !== groupName) return;
+                         const mVal = s.manualShifts[d.dateStr];
+                         if (mVal && mVal !== '休' && mVal !== '有休') {
+                             assignedCount++;
+                         } else if (currentShift[d.dateStr][s.id] && currentShift[d.dateStr][s.id] !== '休') {
+                             assignedCount++;
+                         }
+                     });
+                     
+                     if (d.isWeekend) {
+                         weekendCounts.push(assignedCount);
+                     } else {
+                         weekdayCounts.push(assignedCount);
+                     }
+                 });
+                 
+                 // 平日の平準化（同じ週の平日の中でばらつきをなくす）
+                 if (weekdayCounts.length > 0) {
+                     const avgWeekday = weekdayCounts.reduce((sum, val) => sum + val, 0) / weekdayCounts.length;
+                     let varianceWeekday = weekdayCounts.reduce((sum, val) => sum + Math.pow(val - avgWeekday, 2), 0);
+                     trialPenalty += varianceWeekday * 3000; 
+                 }
+                 
+                 // 土日祝の平準化（同じ週の土日祝の中でばらつきをなくす）
+                 if (weekendCounts.length > 0) {
+                     const avgWeekend = weekendCounts.reduce((sum, val) => sum + val, 0) / weekendCounts.length;
+                     let varianceWeekend = weekendCounts.reduce((sum, val) => sum + Math.pow(val - avgWeekend, 2), 0);
+                     trialPenalty += varianceWeekend * 3000;
+                 }
+             });
+          });
+
+          // 5. 規定の休日数（公休+有休）ペナルティ
+          staffs.forEach(s => {
+            let requiredBaseOff = s.type.includes('一般') ? 10 : weekendsOnlyCount; 
+            let mPaidOff = 0; 
+            let workCount = 0;
+            calendarDays.forEach(d => {
+              const mVal = s.manualShifts[d.dateStr];
+              if (mVal) {
+                if (mVal === '有休') mPaidOff++;
+                if (mVal !== '休' && mVal !== '有休') workCount++;
+              } else if (currentShift[d.dateStr] && currentShift[d.dateStr][s.id] && currentShift[d.dateStr][s.id] !== '休') {
+                workCount++;
+              }
+            });
+            
+            let targetTotalOff = requiredBaseOff + mPaidOff;
+
+            const rests = daysInMonth - workCount;
+            if (s.type.includes('一般')) {
+              if (rests !== targetTotalOff) {
+                trialPenalty += Math.abs(targetTotalOff - rests) * 1000000000; // 一般は絶対厳守
+              }
+            } else {
+              // 総合は月跨ぎの週休2日を優先するため、月の総休日の厳格な縛りを緩める
+              if (rests !== targetTotalOff) {
+                trialPenalty += Math.abs(targetTotalOff - rests) * 1000;
+              }
+            }
+          });
+
+          if (trialPenalty < minScore) {
+            minScore = trialPenalty;
+            bestShift = JSON.parse(JSON.stringify(currentShift)); // ディープコピーで保存
+          }
+        }
+
+        if (bestShift) {
+          generatedShifts = { ...generatedShifts, ...bestShift };
+        }
+        
+        btnContent.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i> シフト生成`;
+        renderTable();
+      }, 50);
+    }
+
+    // --- Init ---
+    document.addEventListener('DOMContentLoaded', () => {
+      // 追加フォームのグループ初期描画
+      window.renderAddFormGroup();
+      window.renderShiftReqForms();
+      
+      document.getElementById('btn-prev-month').addEventListener('click', () => changeMonth(-1));
+      document.getElementById('btn-next-month').addEventListener('click', () => changeMonth(1));
+      
+      document.getElementById('btn-add-staff').addEventListener('click', addStaff);
+      document.getElementById('input-staff-name').addEventListener('keydown', (e) => {
+        if(e.key === 'Enter') addStaff();
+      });
+
+      document.getElementById('btn-generate').addEventListener('click', generateShift);
+
+      document.getElementById('btn-clear').addEventListener('click', () => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth() + 1;
+        if (confirm(`${year}年${month}月の自動生成されたシフトをクリアしますか？\n（手動で入力した希望休や固定シフトはそのまま残ります）`)) {
+          const prefix = `${year}-${String(month).padStart(2, '0')}-`;
+          const newShifts = {};
+          for (const dateStr in generatedShifts) {
+            if (!dateStr.startsWith(prefix)) {
+              newShifts[dateStr] = generatedShifts[dateStr];
+            }
+          }
+          generatedShifts = newShifts;
+          renderTable();
+        }
+      });
+
+      renderMonthHeader();
+      renderTable();
+    });
+
+  </script>
+</body>
+</html>
