@@ -30,15 +30,35 @@
       </div>
       
       <div class="col-span-1 flex justify-center">
-        <div class="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-          <button id="btn-prev-month" class="p-3 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200">
-            <i data-lucide="chevron-left" class="w-6 h-6 text-slate-600"></i>
-          </button>
-          <h2 id="month-display" class="text-xl md:text-2xl font-black min-w-[160px] text-center text-slate-800">
-            <!-- JSで年月を描画 -->
-          </h2>
-          <button id="btn-next-month" class="p-3 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200">
-            <i data-lucide="chevron-right" class="w-6 h-6 text-slate-600"></i>
+        <div class="flex items-center gap-2">
+          <div class="relative">
+            <div class="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+              <button id="btn-prev-month" class="p-3 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200">
+                <i data-lucide="chevron-left" class="w-6 h-6 text-slate-600"></i>
+              </button>
+              <h2 id="month-display" onclick="window.toggleMonthPicker(event)" class="text-xl md:text-2xl font-black min-w-[160px] py-1.5 px-2 rounded-xl text-center text-slate-800 cursor-pointer hover:bg-slate-200 hover:text-indigo-700 transition-colors" title="月を直接選択">
+                <!-- JSで年月を描画 -->
+              </h2>
+              <button id="btn-next-month" class="p-3 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200">
+                <i data-lucide="chevron-right" class="w-6 h-6 text-slate-600"></i>
+              </button>
+            </div>
+
+            <!-- 月選択ポップアップ -->
+            <div id="month-picker-popup" class="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-[280px] bg-white rounded-2xl shadow-xl border border-slate-200 z-[100] hidden opacity-0 transition-all duration-200 p-4 transform origin-top -translate-y-2">
+              <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                <button onclick="window.changePickerYear(-1, event)" class="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-500 hover:text-slate-800" title="前年"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                <div id="picker-year-display" class="font-black text-lg text-slate-800"></div>
+                <button onclick="window.changePickerYear(1, event)" class="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-500 hover:text-slate-800" title="翌年"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+              </div>
+              <div id="month-picker-grid" class="grid grid-cols-3 gap-2">
+                <!-- JSで描画 -->
+              </div>
+            </div>
+          </div>
+          <button id="btn-current-month" class="px-3 py-2 md:px-4 md:py-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm flex flex-col items-center justify-center gap-1 text-slate-600" title="今月に戻る">
+            <i data-lucide="calendar-check" class="w-4 h-4 md:w-5 md:h-5"></i>
+            <span class="text-[9px] md:text-xs font-bold leading-none">今月</span>
           </button>
         </div>
       </div>
@@ -704,6 +724,67 @@
       renderTable();
     };
 
+    // --- Month Picker Functions ---
+    let pickerYear = currentDate.getFullYear();
+    let isMonthPickerOpen = false;
+
+    window.toggleMonthPicker = (event) => {
+        if (event) event.stopPropagation();
+        const popup = document.getElementById('month-picker-popup');
+        
+        if (isMonthPickerOpen) {
+            window.closeMonthPicker();
+        } else {
+            pickerYear = currentDate.getFullYear();
+            document.getElementById('picker-year-display').textContent = `${pickerYear}年`;
+            window.renderMonthPickerGrid();
+            
+            popup.classList.remove('hidden');
+            setTimeout(() => {
+                popup.classList.remove('opacity-0', '-translate-y-2');
+            }, 10);
+            isMonthPickerOpen = true;
+        }
+    };
+
+    window.closeMonthPicker = () => {
+        const popup = document.getElementById('month-picker-popup');
+        popup.classList.add('opacity-0', '-translate-y-2');
+        setTimeout(() => {
+            popup.classList.add('hidden');
+            isMonthPickerOpen = false;
+        }, 200);
+    };
+
+    window.changePickerYear = (delta, event) => {
+        if (event) event.stopPropagation();
+        pickerYear += delta;
+        document.getElementById('picker-year-display').textContent = `${pickerYear}年`;
+        window.renderMonthPickerGrid();
+    };
+
+    window.renderMonthPickerGrid = () => {
+        let html = '';
+        const currentM = currentDate.getMonth();
+        const currentY = currentDate.getFullYear();
+        
+        for (let i = 0; i < 12; i++) {
+            const isCurrent = (pickerYear === currentY && i === currentM);
+            const bgClass = isCurrent ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-100 hover:border-indigo-200';
+            html += `<button onclick="window.selectPickerMonth(${i}, event)" class="py-2.5 rounded-xl font-bold transition-all text-sm ${bgClass}">${i + 1}月</button>`;
+        }
+        document.getElementById('month-picker-grid').innerHTML = html;
+    };
+
+    window.selectPickerMonth = (monthIndex, event) => {
+        if (event) event.stopPropagation();
+        currentDate.setFullYear(pickerYear);
+        currentDate.setMonth(monthIndex);
+        renderMonthHeader();
+        renderTable();
+        window.closeMonthPicker();
+    };
+
     // --- Modal Functions ---
 
     window.openShiftReqModal = () => {
@@ -1213,6 +1294,13 @@
             setTimeout(() => {
                 popup.classList.add('hidden');
             }, 150);
+        }
+
+        // 月選択ポップアップを外側クリックで閉じる
+        const monthPopup = document.getElementById('month-picker-popup');
+        const monthDisplay = document.getElementById('month-display');
+        if (isMonthPickerOpen && monthPopup && !monthPopup.contains(e.target) && !monthDisplay.contains(e.target)) {
+            window.closeMonthPicker();
         }
     });
 
@@ -2302,6 +2390,12 @@
       
       document.getElementById('btn-prev-month').addEventListener('click', () => changeMonth(-1));
       document.getElementById('btn-next-month').addEventListener('click', () => changeMonth(1));
+      
+      document.getElementById('btn-current-month').addEventListener('click', () => {
+        currentDate = new Date();
+        renderMonthHeader();
+        renderTable();
+      });
       
       document.getElementById('btn-add-staff').addEventListener('click', addStaff);
       document.getElementById('input-staff-name').addEventListener('keydown', (e) => {
