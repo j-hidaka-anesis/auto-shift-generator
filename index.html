@@ -141,7 +141,7 @@
       <!-- グループ管理エリア -->
       <div class="p-4 border-b border-slate-100 bg-white">
         <h3 class="font-bold text-slate-700 mb-2 flex items-center gap-2 text-sm">
-          <i data-lucide="folder-cog" class="w-4 h-4 text-slate-500"></i> グループ名の管理（編集・追加・削除）
+          <i data-lucide="folder-cog" class="w-4 h-4 text-slate-500"></i> チーム名の管理（編集・追加・削除）
         </h3>
         <div id="group-management-content" class="space-y-2">
           <!-- JSで描画 -->
@@ -860,7 +860,7 @@
       
       html += `
           <div class="flex items-center gap-1 ml-2">
-              <input type="text" id="new-group-input" placeholder="新グループ名" class="border border-slate-200 rounded-lg p-1 text-sm w-24 outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input type="text" id="new-group-input" placeholder="新チーム名" onkeydown="if(event.key === 'Enter') window.handleAddGroupBtn()" class="border border-slate-200 rounded-lg p-1 text-sm w-24 outline-none focus:ring-2 focus:ring-indigo-500" />
               <button onclick="window.handleAddGroupBtn()" class="bg-slate-800 text-white p-1 rounded-lg hover:bg-slate-700 transition-colors" title="追加">
                   <i data-lucide="plus" class="w-4 h-4"></i>
               </button>
@@ -879,7 +879,7 @@
             return;
         }
         if (shiftReq[newName] || newName === '') {
-            alert('既に存在するグループ名です。');
+            alert('既に存在するチーム名です。');
             window.renderGroupManagement();
             return;
         }
@@ -907,7 +907,7 @@
     };
 
     window.handleDeleteGroup = (groupName) => {
-        if (confirm(`グループ「${groupName}」を削除しますか？\n所属しているスタッフは「なし」枠に変更されます。`)) {
+        if (confirm(`チーム「${groupName}」を削除しますか？\n所属しているスタッフは「なし」枠に変更されます。`)) {
             delete shiftReq[groupName];
             staffs.forEach(s => {
                 if (s.group === groupName) s.group = '';
@@ -926,7 +926,7 @@
         newName = newName.replace(/['"]/g, ''); // クォーテーションを除外
         if (newName) {
             if (shiftReq[newName] || newName === '') {
-                alert('既に存在するグループ名です。');
+                alert('既に存在するチーム名です。');
                 return;
             }
             shiftReq[newName] = {
@@ -940,6 +940,11 @@
             window.renderStaffModal();
             window.renderAddFormGroup();
             renderTable();
+
+            setTimeout(() => {
+                const newInput = document.getElementById('new-group-input');
+                if (newInput) newInput.focus();
+            }, 10);
         }
     };
 
