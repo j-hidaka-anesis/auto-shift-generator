@@ -30,8 +30,8 @@
       </div>
       
       <div class="col-span-1 flex justify-center">
-        <div class="flex items-center gap-2">
-          <div class="relative">
+        <div class="flex items-stretch gap-2">
+          <div class="relative flex">
             <div class="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
               <button id="btn-prev-month" class="p-3 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200">
                 <i data-lucide="chevron-left" class="w-6 h-6 text-slate-600"></i>
@@ -56,9 +56,9 @@
               </div>
             </div>
           </div>
-          <button id="btn-current-month" class="px-3 py-2 md:px-4 md:py-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm flex flex-col items-center justify-center gap-1 text-slate-600" title="今月に戻る">
-            <i data-lucide="calendar-check" class="w-4 h-4 md:w-5 md:h-5"></i>
-            <span class="text-[9px] md:text-xs font-bold leading-none">今月</span>
+          <button id="btn-current-month" class="aspect-square bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm flex flex-col items-center justify-center gap-1.5 text-slate-600 shrink-0" title="今月に戻る">
+            <i data-lucide="calendar-check" class="w-5 h-5 md:w-6 md:h-6"></i>
+            <span class="text-[10px] md:text-xs font-bold leading-none">今月</span>
           </button>
         </div>
       </div>
@@ -299,6 +299,21 @@
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
       document.getElementById('month-display').textContent = `${year}年 ${month}月`;
+
+      // 「今月」ボタンの色付け制御
+      const today = new Date();
+      const isCurrentMonth = year === today.getFullYear() && (month - 1) === today.getMonth();
+      const btnCurrentMonth = document.getElementById('btn-current-month');
+      
+      if (btnCurrentMonth) {
+          if (isCurrentMonth) {
+              btnCurrentMonth.classList.remove('bg-blue-50', 'border-blue-200', 'text-blue-600', 'hover:bg-blue-100');
+              btnCurrentMonth.classList.add('bg-white', 'border-slate-200', 'text-slate-600', 'hover:bg-slate-50');
+          } else {
+              btnCurrentMonth.classList.remove('bg-white', 'border-slate-200', 'text-slate-600', 'hover:bg-slate-50');
+              btnCurrentMonth.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-600', 'hover:bg-blue-100');
+          }
+      }
     }
 
     // スタッフ追加フォームのグループ選択プルダウンを描画する
