@@ -2326,32 +2326,38 @@
               }
             });
 
-            // 「一人にしない」の同伴ペナルティ (絶対厳守)
-            const shiftTypes = ['A', 'B', '10', '11'];
-            shiftTypes.forEach(shiftType => {
-                let hasNeedsFollowUp = false;
-                let hasIndependent = false;
+            // 「一人にしない」の同伴ペナルティ (絶対厳守) - チームごとにチェック
+            groups.forEach(groupName => {
+                if (shiftReq[groupName].enabled === false) return;
                 
-                staffs.forEach(s => {
-                  const mVal = s.manualShifts[d.dateStr];
-                  const autoVal = currentShift[d.dateStr][s.id];
-                  let actualShift = null;
-                  if (mVal && mVal !== '休' && mVal !== '有休') {
-                    actualShift = mVal;
-                  } else if (autoVal && autoVal !== '休') {
-                    actualShift = autoVal;
-                  }
-                  
-                  if (actualShift === shiftType) {
-                    if (s.needsFollowUp) hasNeedsFollowUp = true;
-                    else hasIndependent = true;
-                  }
+                const shiftTypes = ['A', 'B', '10', '11'];
+                shiftTypes.forEach(shiftType => {
+                    let hasNeedsFollowUp = false;
+                    let hasIndependent = false;
+                    
+                    staffs.forEach(s => {
+                      if (s.group !== groupName) return; // 同じチーム内でチェック
+                      
+                      const mVal = s.manualShifts[d.dateStr];
+                      const autoVal = currentShift[d.dateStr][s.id];
+                      let actualShift = null;
+                      if (mVal && mVal !== '休' && mVal !== '有休') {
+                        actualShift = mVal;
+                      } else if (autoVal && autoVal !== '休') {
+                        actualShift = autoVal;
+                      }
+                      
+                      if (actualShift === shiftType) {
+                        if (s.needsFollowUp) hasNeedsFollowUp = true;
+                        else hasIndependent = true;
+                      }
+                    });
+                    
+                    // 同じチーム・同じシフトに「一人にしない(オン)」の人がいるのに、「一人でOK(オフ)」の人がいない場合は超特大ペナルティ
+                    if (hasNeedsFollowUp && !hasIndependent) {
+                      trialPenalty += 500000000; // 5億のペナルティで強力に阻止
+                    }
                 });
-                
-                // 同じシフトに「一人にしない(オン)」の人がいるのに、「一人でOK(オフ)」の人がいない場合は超特大ペナルティ
-                if (hasNeedsFollowUp && !hasIndependent) {
-                  trialPenalty += 500000000; // 5億のペナルティで強力に阻止
-                }
             });
           });
 
