@@ -26,21 +26,22 @@
           <i data-lucide="calendar" class="w-6 h-6 text-indigo-600"></i>
           シフト自動生成ツール
         </h1>
-        <p class="text-xs md:text-sm text-slate-500 mt-1">表の各マスをクリックするとプルダウンが開き、シフトを選択できます</p>
       </div>
       
       <div class="col-span-1 flex justify-center">
         <div class="flex items-stretch gap-2">
           <div class="relative flex">
             <div class="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-              <button id="btn-prev-month" class="p-3 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200">
+              <button id="btn-prev-month" class="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200 flex flex-col items-center justify-center gap-1">
                 <i data-lucide="chevron-left" class="w-6 h-6 text-slate-600"></i>
+                <span class="text-[9px] md:text-[10px] font-bold text-slate-500 leading-none">先月</span>
               </button>
               <h2 id="month-display" onclick="window.toggleMonthPicker(event)" class="text-xl md:text-2xl font-black min-w-[160px] py-1.5 px-2 rounded-xl text-center text-slate-800 cursor-pointer hover:bg-slate-200 hover:text-indigo-700 transition-colors" title="月を直接選択">
                 <!-- JSで年月を描画 -->
               </h2>
-              <button id="btn-next-month" class="p-3 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200">
+              <button id="btn-next-month" class="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-transparent hover:border-slate-200 flex flex-col items-center justify-center gap-1">
                 <i data-lucide="chevron-right" class="w-6 h-6 text-slate-600"></i>
+                <span class="text-[9px] md:text-[10px] font-bold text-slate-500 leading-none">翌月</span>
               </button>
             </div>
 
@@ -292,6 +293,44 @@
     let staffs = [];
 
     const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+
+    // --- Storage Functions ---
+    const STORAGE_KEY = 'shift_maker_app_data';
+
+    window.saveData = () => {
+      const data = {
+        generatedShifts,
+        dailyMemos,
+        colColors,
+        memoColors,
+        nightShiftConfig,
+        shiftReq,
+        staffs,
+        isSummaryExpanded,
+        isMemoVisible
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    };
+
+    window.loadData = () => {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          if (data.generatedShifts) generatedShifts = data.generatedShifts;
+          if (data.dailyMemos) dailyMemos = data.dailyMemos;
+          if (data.colColors) colColors = data.colColors;
+          if (data.memoColors) memoColors = data.memoColors;
+          if (data.nightShiftConfig) nightShiftConfig = data.nightShiftConfig;
+          if (data.shiftReq) shiftReq = data.shiftReq;
+          if (data.staffs) staffs = data.staffs;
+          if (data.isSummaryExpanded !== undefined) isSummaryExpanded = data.isSummaryExpanded;
+          if (data.isMemoVisible !== undefined) isMemoVisible = data.isMemoVisible;
+        } catch (e) {
+          console.error('データの読み込みに失敗しました', e);
+        }
+      }
+    };
 
     // --- Render Functions ---
 
@@ -575,18 +614,21 @@
           // 内訳カウントと表示色の設定
           if (manualVal) {
             displayVal = manualVal;
+            const isManualCustomInput = staff.isCustomInput && staff.isCustomInput[d.dateStr];
+            const isStandardPreset = !isManualCustomInput && ['休', '有休', 'A', 'B', '10', '11'].includes(manualVal);
+
             if (manualVal === '休' || manualVal === '有休') {
-              textColor = 'text-red-600';
-              bgColor = 'bg-red-100'; 
+              textColor = isStandardPreset ? 'text-red-600' : 'text-blue-600';
+              bgColor = isStandardPreset ? 'bg-red-50' : 'bg-blue-100'; 
               manualOffCount++;
               if (manualVal === '有休') counts['有休']++;
-            } else if (['A', 'B', '10', '11'].includes(manualVal)) {
-              textColor = 'text-red-600'; 
-              workCount++;
-              counts[manualVal]++;
             } else {
-              textColor = 'text-blue-700'; 
+              textColor = isStandardPreset ? 'text-red-600' : 'text-blue-600'; 
+              bgColor = 'bg-white';
               workCount++;
+              if (['A', 'B', '10', '11'].includes(manualVal)) {
+                counts[manualVal]++;
+              }
             }
           } else if (isAutoWorking) {
             displayVal = autoVal; 
@@ -731,6 +773,7 @@
       document.getElementById('table-container').innerHTML = html;
       
       lucide.createIcons();
+      window.saveData(); // 表が描画されるたびにデータを保存
     }
 
     // アコーディオンの開閉トグル
@@ -1453,6 +1496,7 @@
             // contenteditableで入り込む余分な末尾の改行を取り除く
             dailyMemos[dateStr] = value.replace(/\n+$/, '');
         }
+        window.saveData(); // メモの変更時にも保存
     };
 
     window.handleSelectChange = (event, staffId, dateStr) => {
@@ -1471,13 +1515,18 @@
         const input = prompt('シフトを入力してください（例：14-18、遅番など）', currentVal);
         if (input !== null && input.trim() !== '') {
           staff.manualShifts[dateStr] = input.trim();
+          staff.isCustomInput = staff.isCustomInput || {};
+          staff.isCustomInput[dateStr] = true;
         } else if (input !== null && input.trim() === '') {
           delete staff.manualShifts[dateStr];
+          if (staff.isCustomInput) delete staff.isCustomInput[dateStr];
         }
       } else if (val === '') {
         delete staff.manualShifts[dateStr];
+        if (staff.isCustomInput) delete staff.isCustomInput[dateStr];
       } else {
         staff.manualShifts[dateStr] = val;
+        if (staff.isCustomInput) delete staff.isCustomInput[dateStr];
       }
       
       renderTable();
@@ -1503,6 +1552,7 @@
           group: inputGroup.value,
           needsFollowUp: true, 
           manualShifts: {},
+          isCustomInput: {},
           offPreference: '',
           cellColors: {}
         });
@@ -2399,6 +2449,8 @@
 
     // --- Init ---
     document.addEventListener('DOMContentLoaded', () => {
+      window.loadData(); // アプリ起動時に保存されたデータを読み込む
+
       // 追加フォームのグループ初期描画
       window.renderAddFormGroup();
       window.renderShiftReqForms();
